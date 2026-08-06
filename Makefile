@@ -15,7 +15,8 @@ PLATFORM        ?= nvidia
 PLATFORM_DEFINE ?= -DPLATFORM_NVIDIA
 STUDENT_SUFFIX  := cu
 CFLAGS          := -std=c++17 -O0
-EXTRA_LIBS     	:= 
+EXTRA_LIBS     	:=
+COMP_ONLY_FLAGS :=
 
 # Compiler & Tester object selection based on PLATFORM
 ifeq ($(PLATFORM),nvidia)
@@ -24,10 +25,11 @@ ifeq ($(PLATFORM),nvidia)
 	PLATFORM_DEFINE := -DPLATFORM_NVIDIA
 else ifeq ($(PLATFORM),iluvatar)
     CC          	:= clang++
-	CFLAGS          := -std=c++17 -O3
+	CFLAGS          := -std=c++17 -O3 -I/usr/local/corex/include -fPIC
+	COMP_ONLY_FLAGS := -x ivcore --cuda-path=/usr/local/corex
     TEST_OBJ    	:= tester/tester_iluvatar.o
 	PLATFORM_DEFINE := -DPLATFORM_ILUVATAR
-	EXTRA_LIBS		:= -lcudart -I/usr/local/corex/include -L/usr/local/corex/lib64 -fPIC
+	EXTRA_LIBS		:= -lcudart -L/usr/local/corex/lib64
 else ifeq ($(PLATFORM),moore)
     CC          	:= mcc
 	CFLAGS          := -std=c++11 -O3
@@ -100,4 +102,4 @@ $(TARGET): $(STUDENT_OBJ) $(TEST_OBJ)
 # Generate src object: Compile kernels.cu (triggers template instantiation)
 $(STUDENT_OBJ): $(STUDENT_SRC)
 	@echo "=== Compiling student code ($(STUDENT_SRC)) ==="
-	$(CC) $(CFLAGS) $(PLATFORM_DEFINE) -c $< -o $@
+	$(CC) $(CFLAGS) $(COMP_ONLY_FLAGS) $(PLATFORM_DEFINE) -c $< -o $@
