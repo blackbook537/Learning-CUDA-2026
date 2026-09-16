@@ -5,7 +5,7 @@
 | 文档版本 | v1.0 |
 |---|---|
 | 适用代码 | nlm_denoise_project（2026-summer-project） |
-| 默认平台 | NVIDIA（兼容 天数 CoreX / 沐曦 MACA / 摩尔 MUSA） |
+| 默认平台 | NVIDIA；Iluvatar CoreX/MR-V100、Moore MUSA/MTT S4000 与 MetaX MACA/C500 均已实测 |
 | 配套文档 | [架构设计文档](architecture_design.md) |
 
 ---
@@ -169,12 +169,14 @@ main.cpp ──┬──► pipeline ──► kernels.h（Gpu* 接口）──�
 | 组件 | 要求 |
 |---|---|
 | 操作系统 | Linux x86_64（训练营服务器或本地） |
-| 编译器 | CUDA Toolkit ≥ 11.0（nvcc）；GNU Make |
-| GPU | NVIDIA 计算能力 ≥ 7.0（开发验证机：RTX 3060 Laptop, sm_86） |
+| 编译器 | NVIDIA：CUDA Toolkit ≥ 11.0（nvcc）；Iluvatar：CoreX 4.4（clang++）；MetaX：MACA 3.0（mxcc）；Moore：MUSA 5.1（mcc）；GNU Make |
+| GPU | NVIDIA sm_86/sm_89、Iluvatar MR-V100、MetaX C500 25% sGPU、Moore MTT S4000 均已实测 |
 | C++ 标准 | C++17（摩尔线程平台为 C++11 子集，代码已兼容） |
 | 可选依赖 | OpenCV 4.x（仅 `validate` 交叉验证用，`pkg-config opencv4` 可见） |
 
-国产平台：天数 BI-150 CoreX 环境（clang++）、沐曦标准 MACA 环境（mxcc）、摩尔 MUSA 环境（mcc）。
+国产平台：天数 CoreX 4.4 环境（clang++；MR-V100 32 GB 已实测）、沐曦 MACA 3.0
+环境（mxcc；C500 25% sGPU 已实测）、摩尔 MUSA 环境（mcc；MTT S4000 /
+MUSA 5.1 已实测）；三条路径均通过完整矩阵。
 
 ### 4.2 获取与构建
 
@@ -191,13 +193,25 @@ make test                     # 同 run（兼容别名）
 
 # 国产平台
 make build PLATFORM=metax     # 沐曦（编译 kernels/metax/kernels.maca）
-make build PLATFORM=moore     # 摩尔（C++11）
+make build PLATFORM=moore     # 摩尔（默认 MUSA_HOME=/usr/local/musa）
 make build PLATFORM=iluvatar  # 天数
 
 # 可选开关
 make WITH_OPENCV=1            # validate 增加 OpenCV 交叉验证
 make FAST_EXP=1               # 权重换 __expf 近似（见 §8 FAQ-6）
 ```
+
+Moore 构建默认调用 `/usr/local/musa/bin/mcc`，链接时写入
+`RUNPATH=/usr/local/musa/lib`；SDK 在其他位置时增加
+`MUSA_HOME=/path/to/musa`。因此程序不依赖用户预先导出 PATH/LD_LIBRARY_PATH。
+
+MetaX 构建默认使用 `/opt/maca`：`mxcc` 位于 `mxgpu_llvm/bin/`，CUDA 兼容头位于
+`tools/cu-bridge/include`，运行库位于 `lib/` 并写入 RUNPATH。非标准布局可覆盖
+`MACA_HOME`、`MACA_CUDA` 与 `MXCC`。
+
+Iluvatar 构建默认使用 `/usr/local/corex`：主机和设备代码均由
+`/usr/local/corex/bin/clang++` 编译，设备代码增加 `-x ivcore`，运行库目录写入
+RUNPATH。非标准布局可覆盖 `COREX_HOME` 与 `COREX_CXX`。
 
 ### 4.3  smoke test（30 秒验证环境）
 
@@ -232,7 +246,8 @@ sigma = 25.0              # 噪声标准差估计，对于8位图像范围0-255
 #### 5.2.1 run —— 单图降噪
 
 ```bash
-./build/nlm_denoise run -i data/noisy/noisy.png -o data/output/denoised_noisy_v2.png \
+./build/nlm_denoise run -i data/noisy/noisy_1920x1080_3ch_sigma25.png \
+                  -o data/output/denoised_noisy_v2.png \
                   -p params/default.txt --kernel 2 --with-cpu
 ```
 
@@ -247,7 +262,8 @@ sigma = 25.0              # 噪声标准差估计，对于8位图像范围0-255
 #### 5.2.2 validate —— 正确性校验
 
 ```bash
-./build/nlm_denoise validate -i data/noisy/noisy.png -o data/output/validated.png -p params/default.txt
+./build/nlm_denoise validate -i data/noisy/noisy_1920x1080_3ch_sigma25.png \
+  -o data/output/validated.png -p params/default.txt
 ```
 
 流程：CPU 参考 → V0/V1/V2 逐一 GPU 运行 → 对比 MAE/PSNR → 判定 PASS/FAIL。
@@ -257,19 +273,35 @@ sigma = 25.0              # 噪声标准差估计，对于8位图像范围0-255
 
 ```bash
 ./build/nlm_denoise bench --sizes 1920x1080,3840x2160 --channels 1,3 \
-                    --warmup 3 --repeat 10 --log bench.csv [--with-cpu]
+  --param-sets small,base,strong-h,large --warmup 3 --repeat 10 \
+  --log experiments/results/current/benchmark.csv
 ```
 
-对每组（分辨率 × 通道 × 4 组参数 × 3 个 kernel 版本）预热 warmup 次、测量 repeat 次，
-`kernel_ms` 取最小值、`e2e_ms` 取均值。CSV 列：
+对每组（分辨率 × 通道 × 参数组 × 3 个 kernel 版本）预热 warmup 次、测量 repeat 次，
+同时保存 kernel/e2e 的均值、最小值和总体标准差。CSV 列：
 
 ```text
-size,channels,pr,sr,h,sigma,kernel_ver,kernel_ms,e2e_ms,mpx_s,cpu_ms,speedup
+config,size,channels,pr,sr,h,sigma,kernel_ver,warmup,repeat,
+kernel_mean_ms,kernel_min_ms,kernel_stddev_ms,
+e2e_mean_ms,e2e_min_ms,e2e_stddev_ms,mpx_s,
+cpu_repeat,cpu_mean_ms,cpu_min_ms,cpu_stddev_ms,speedup_e2e
 ```
 
-> 提示：`--with-cpu` 仅对 ≤1080p 灰度量级的配置测量 CPU 耗时（单线程 CPU 极慢，1080p RGB 约 141 s）。
+> `--with-cpu --cpu-repeat N` 对不超过 1080p 的每个所选参数组单独测 CPU，且与 GPU
+> 使用相同输入和参数。正式 CPU 对比建议 `--param-sets base --cpu-repeat 3`。
 
-#### 5.2.4 gen —— 测试图生成
+#### 5.2.4 metrics —— 图像质量指标
+
+```bash
+./build/nlm_denoise metrics \
+  --reference experiments/work/clean_1920x1080_3ch.png \
+  --test experiments/work/denoised_base_1920x1080_3ch_sigma25.png \
+  --label base --log experiments/results/current/quality_tradeoff.csv
+```
+
+输入必须同尺寸同通道。命令输出 MAE/PSNR；指定 `--log` 时自动创建带表头 CSV。
+
+#### 5.2.5 gen —— 测试图生成
 
 ```bash
 ./build/nlm_denoise gen -o data/noisy/noisy_3840x2160_3ch_sigma25.png --size 3840x2160 --channels 3 --sigma 25 --seed 1
@@ -277,7 +309,7 @@ size,channels,pr,sr,h,sigma,kernel_ver,kernel_ms,e2e_ms,mpx_s,cpu_ms,speedup
 
 生成"双向渐变纹理 + LCG 均匀噪声"合成图，相同 seed 输出完全一致，便于复现。
 
-#### 5.2.5 units —— 单元测试
+#### 5.2.6 units —— 单元测试
 
 ```bash
 ./build/nlm_denoise units     # 12 项，无需 GPU；全过返回 0
@@ -287,6 +319,9 @@ size,channels,pr,sr,h,sigma,kernel_ver,kernel_ms,e2e_ms,mpx_s,cpu_ms,speedup
 
 ```bash
 bash scripts/run_all.sh        # 构建 → units → 1080p validate → 1080p+4K bench
+bash scripts/run_reproducible_4090.sh  # 正式 4090 全流程（环境/CPU/GPU/质量/nsys）
+bash scripts/run_reproducible_moore.sh # MTT S4000/MUSA 全流程（环境/CPU/GPU/质量）
+bash scripts/run_quality_sweep.sh      # small/base/large + sigma10/25/50
 bash scripts/ncu_profile.sh    # Nsight Compute：V0/V1/V2 三组指标采集（需 ncu）
 bash scripts/nsys_profile.sh   # Nsight Systems：4K 全链路时间线（需 nsys）
 ```
@@ -339,11 +374,44 @@ ver    kernel(ms)   e2e(ms)      MAE(vsCPU)   PSNR(dB)   判定
 
 **解读**：kernel 纯计算 348 ms；H2D/D2H 合计 < 6 ms，说明计算是绝对瓶颈（compute-bound），进一步优化应指向算法级（积分图近似等）而非传输。
 
+### 6.4 MetaX C500 运行实录（25% sGPU，MACA 3.0）
+
+```text
+[validate] CPU 参考耗时: 179382.8 ms
+ver    kernel(ms)   e2e(ms)      MAE(vsCPU)   PSNR(dB)   判定
+0      798.987      824.309      0.0000       inf        PASS
+1      418.401      422.132      0.0000       inf        PASS
+2      1487.083     1489.690     0.0000       inf        PASS
+[validate] 总体判定: PASS
+```
+
+正式 warmup=3/repeat=10 复测中，1080p RGB/base 的 V1 kernel/e2e 为
+418.397±0.014 / 420.733±0.049 ms，4K 为 1645.636±0.018 /
+1655.068±0.107 ms。C500 上 V1 最快，V2 比 V1 慢约 3.55×，业务运行应选择
+`--kernel 1`；三个版本的输出正确性不受影响。
+
+### 6.5 Iluvatar MR-V100 运行实录（32 GB，CoreX 4.4.0）
+
+```text
+[validate] CPU 参考耗时: 232556.7 ms
+ver    kernel(ms)   e2e(ms)      MAE(vsCPU)   PSNR(dB)   判定
+0      1561.551     1601.035     0.0000       inf        PASS
+1      792.049      796.391      0.0000       inf        PASS
+2      712.314      716.229      0.0000       inf        PASS
+[validate] 总体判定: PASS
+```
+
+正式 warmup=3/repeat=10 复测中，1080p RGB/base 的 V2 kernel/e2e 为
+716.595±9.802 / 721.346±9.947 ms，4K 为 2869.991±42.442 /
+2888.719±42.348 ms。同机 CPU 三次均值 232.815 s，V2 端到端加速 322.75×。
+三版本输出 PNG 的 SHA-256 完全相同，完整 48 配置矩阵也通过唯一键检查。
+
 ---
 
 ## 7. 性能数据总览
 
-完整 48 组数据见项目根目录 `bench.csv`（warmup=3，repeat=10，kernel_ms 取最小值）。
+旧版完整 48 组数据见 `experiments/results/rtx3060_laptop/benchmark_legacy.csv`；
+正式新实验写入 `experiments/results/current/benchmark.csv`，含 mean/min/stddev。
 
 ### 7.1 kernel 耗时（ms）与吞吐量
 
@@ -361,7 +429,7 @@ ver    kernel(ms)   e2e(ms)      MAE(vsCPU)   PSNR(dB)   判定
 ### 7.2 关键结论
 
 1. **smem 是最有效优化**：V0→V1 稳定 2.2–2.9×，与理论（全局访存复用率提升约一个数量级）一致；
-2. **模板展开收益有边界**：pr≤3 收益 5–30%，pr=4 寄存器溢出反降 70% → 已按实测自适应分派；
+2. **模板展开收益依赖平台**：NVIDIA/Moore/Iluvatar 的 pr≤3 有收益，C500/MACA 3.0 的 base/pr=3 反而慢约 3.55×；pr≥4 已自适应回退 V1；
 3. **`__expf` 无收益**：近似指数误差低于 u8 量化阈值（MAE<5e-5）但耗时不变——瓶颈在 patch FMA 而非 SFU，默认保留精确 `expf`；
 4. **4K 交互式目标**：当前 4K RGB base 约 1.66 s，距离交互式（≤100 ms）需算法级近似（积分图/搜索窗裁剪，见架构文档 V3 路线）。
 
@@ -387,8 +455,8 @@ ver    kernel(ms)   e2e(ms)      MAE(vsCPU)   PSNR(dB)   判定
 **Q6：`FAST_EXP=1` 什么时候该用？**
 实测无性能收益（瓶颈非 exp），默认不建议开启；保留该开关是为报告中"查表/快速数学近似"误差来源分析提供对照。若开启，validate 的 MAE 仍在阈值内（<5e-5），但最终以你们目标平台实测为准。
 
-**Q7：V3（预留版本）报"未实现"？**
-`--kernel 3` 为架构预留的进阶版本（积分图近似/多像素复用/warp 协作），当前返回明确错误提示，属预期行为。
+**Q7：是否支持 V3？**
+不支持。当前公开 CLI 仅接受 V0/V1/V2；V3 只出现在未来工作中，不能作为已完成功能使用。
 
 **Q8：能处理 16 位图或视频流吗？**
 当前仅支持 8 位 PNG/JPG（任务要求）。pipeline 接口为无状态纯函数，外层包帧循环即可扩展为视频/交互式处理；16 位需扩展 image_io 与转换 kernel。
@@ -405,15 +473,20 @@ ver    kernel(ms)   e2e(ms)      MAE(vsCPU)   PSNR(dB)   判定
 | `未知参数 key` / `超出允许范围` | 参数文件拼写或取值错误 | 对照 params/default.txt 修正 |
 | `kernel version=3 未实现` | 使用了预留版本 | 用 `--kernel 0/1/2` |
 | GPU 报错 `[GPU] ... @ kernels_impl.inl` | 驱动/显存异常 | 错误信息含 CUDA 原始描述与行号；显存不足时换更小分辨率验证 |
-| V2 比 V1 慢 | pr≥4 展开回归（旧代码） | 当前代码已自动回退；确认源码为修正后版本 |
+| V2 比 V1 慢 | 可能是 pr≥4，或 MetaX 编译器/架构上的模板展开回退 | pr≥4 会自动回退；C500 当前实测应显式用 `--kernel 1` |
 | 国产平台编译失败 | 未切 PLATFORM / 环境未配 | 按算力文档配置后 `make PLATFORM=metax|moore|iluvatar` |
+| Moore 报 `mcc`/`libmusart.so` 不可见 | MUSA 不在默认目录或使用旧 Makefile | 指定 `MUSA_HOME=/path/to/musa`；确认链接结果含对应 RUNPATH |
+| MetaX 报 `cuda_runtime.h` 或 `wcuda*` 缺失 | 未使用 cu-bridge include/运行库链接 | 使用当前 Makefile；必要时覆盖 `MACA_HOME/MACA_CUDA/MXCC`，并检查 RUNPATH |
+| Iluvatar 报 clang++/`libcudart.so.10.2` 不可见 | CoreX 不在默认路径或使用旧 Makefile | 指定 `COREX_HOME=/path/to/corex`，必要时覆盖 `COREX_CXX`；检查 RUNPATH 指向 CoreX `lib64` |
 | Windows 上 nvcc 报 `Host compiler targets unsupported OS` | Windows nvcc 仅支持 MSVC，不支持 MinGW g++ | 安装 MSVC，或用 WSL + `scripts/build_wsl.sh`（开发机用法，服务器无需） |
 
 **诊断工具**：
 - `./build/nlm_denoise units` —— 先排除 Host 逻辑问题（12 项全过则参数/指标/算法不变式正常）；
 - `validate` 退出码 —— 0/1/2 区分"通过/质量不达标/运行错误"；
 - `--log /dev/null` —— 性能测试时关闭日志落盘干扰；
-- `ncu`/`nsys` 脚本 —— 瓶颈定位（占用率、bank conflict、时间线气泡）。
+- `ncu`/`nsys` 脚本 —— NVIDIA 瓶颈定位（占用率、bank conflict、时间线气泡）；
+- `mcTracer` —— MetaX 原生时间线；本次 C500 已采到 JSON，NLM V1 占求和设备事件 99.617%；
+- 本次 S4000 与 MR-V100 镜像均未提供 profiler CLI，不能直接复用其他平台数据冒充对应平台数据。
 
 ---
 
@@ -426,19 +499,16 @@ nlm_denoise_project/
 ├── Makefile                    # 多平台构建（目标语义对齐参考仓库）
 ├── LICENSE                     # MIT
 ├── README.md                   # 快速上手
-├── nvidia_result.txt           # NVIDIA 平台实测结果（真实输出）
-├── metaX_result.txt            # 沐曦结果（待实测占位）
-├── moore_result.txt            # 摩尔结果（待实测占位）
-├── bench.csv                   # 48 组实测性能数据
 ├── include/                    # 全部头文件（nlm/kernels/pal/core/tester 五层）
 ├── src/                        # Host 实现：main / pipeline / params / image_io / CPU 参考
 ├── kernels/                    # 设备算子：common 共享实现 + 四平台架构子目录
-├── tester/                     # validate / benchmark / test_units
+├── tester/                     # validate / benchmark / metrics / test_units
 ├── build/                      # 构建产物（nlm_denoise + obj/，make clean 清空）
 ├── params/default.txt          # 任务基线参数
-├── data/                       # 数据集中管理（noisy/clean/output/logs 四类）
-├── scripts/                    # run_all / gen_result / ncu / nsys / WSL 开发辅助
-├── docs/                       # architecture_design / user_guide / refactor_log
+├── data/                       # 最小输入样例（clean/noisy）
+├── experiments/                # configs / results / ignored work directory
+├── scripts/                    # 完整复现 / 质量 / 环境 / profiler / 开发辅助
+├── docs/                       # 报告、复现实验手册与 PR 图表
 └── third_party/stb/            # stb_image / stb_image_write
 ```
 
@@ -459,6 +529,7 @@ make
 #   → 看三版本 MAE/PSNR 是否 PASS（正确性）
 ./build/nlm_denoise run -i scene_4k.png -o /dev/null -p params/default.txt --kernel 2 --log /dev/null
 #   → 看 kernel/e2e ms（延迟）；再换 --kernel 1 / small 参数对比权衡
-./build/nlm_denoise bench --sizes 3840x2160 --channels 3 --log mybench.csv
+./build/nlm_denoise bench --sizes 3840x2160 --channels 3 --param-sets all \
+  --log experiments/results/current/mybench.csv
 #   → 得到该机型 4K 全参数组合延迟表，用于质量-延迟权衡分析
 ```

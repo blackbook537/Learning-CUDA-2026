@@ -24,7 +24,7 @@
 | 根级 LICENSE | 缺失 | **新增**：复制参考仓库 MIT LICENSE（提交目标仓库一致） |
 | 根级 Makefile 目标语义（all=build+run、VERBOSE=true、clean） | 目标为 all/run(演示)/test/clean | **重写 Makefile** 对齐（见 §2） |
 | 根级 nvidia_result.txt | 无（仅 bench.csv） | **新增**：真实运行输出生成（环境/测试/校验/基准） |
-| 根级 metaX_result.txt / moore_result.txt | 无 | **新增**：诚实占位（"待实测"，附复现步骤） |
+| 根级 metaX_result.txt / moore_result.txt | 无 | **当时新增**诚实占位；Moore 后续实测并迁入正式结果目录，见 F |
 | src/kernels.{cu,maca,mu} 平台后缀 | 已一致 | 无改动 |
 | tester/ 目录组织（utils.h + 测试逻辑） | 已一致（utils.h + 三个 cpp） | 无改动 |
 | 参考的 tester_{platform}.o 为官方预编译测试壳 | 本项目 tester 为自研源码 | **不迁移**：语义不同（参考的 .o 是题目的预编译测试器，本项目自带完整测试体系，编译产物落位 tester/*.o） |
@@ -52,7 +52,7 @@
 | `LICENSE` | 新增（复制自参考仓库） | 根级三件套完整性；提交目标仓库许可一致 |
 | `Makefile` | 重写（目标语义 + 保留扩展） | 对齐参考构建约定（见 §2） |
 | `nvidia_result.txt` | 新增（脚本真实输出） | 对齐参考的平台结果文件约定；数据来自本次重构后验证运行 |
-| `metaX_result.txt` / `moore_result.txt` | 新增（占位说明） | 结构一致性；未实测平台如实标注 PENDING 并附复现步骤，不造假数据 |
+| `metaX_result.txt` / `moore_result.txt` | 当时新增占位说明 | 未实测阶段如实标注 PENDING；Moore 后续状态见 F |
 | `scripts/gen_result_wsl.sh` | 新增 | nvidia_result.txt 的可复现生成入口（环境+测试+校验+基准抽样） |
 | `scripts/run_all.sh` | `make` → `make build` | 新 Makefile 默认目标含运行测试，避免与脚本显式步骤重复 |
 | `scripts/make_local_wsl.sh` | `make` → `make build` | 同上 |
@@ -181,7 +181,8 @@
 | `data/logs/` | 运行日志（nlm_perf.log 追加写） | `run --log`（缺省） |
 
 迁移：根目录 `nlm_perf.log` → `data/logs/`；既有 `data/clean/clean.png`、
-`data/noisy/noisy.png`（手动数据）保持原名归位。`bench.csv` 为交付报告数据保留根级。
+该阶段曾保留 `data/noisy/noisy.png` 与根级 `bench.csv`；PR 整理阶段已移除重复图片，
+并将分设备 benchmark 归档到 `experiments/results/`，以免根目录混杂输入、结果和源码。
 
 ## D2. 命名规范与自动化落实
 
@@ -211,3 +212,70 @@
   生成正确；run 输出 `data/output/denoised_..._v2.png` 且日志行追加至
   `data/logs/nlm_perf.log`；validate 三版本 MAE=0.0000 / PSNR=inf PASS；
   根目录无 png/log 新增（清洁检查 OK）。
+
+---
+
+# E. PR 证据结构与统计口径升级（2026-09-15）
+
+1. 根级 benchmark/平台日志迁入 `experiments/results/<device>/`，旧 schema 统一标记
+   `_legacy`；未经硬件验证的平台独立放入 `results/unverified/`。
+2. benchmark 新增参数组名、warmup/repeat、kernel/e2e mean/min/stddev，并修复旧版 CPU
+   只测 base 却复用于其他参数组的问题；CPU 和 GPU 现使用相同输入与参数。
+3. 新增 `metrics` 子命令、small/base/large 公平质量实验和 σ=10/25/50 扫描。
+4. 新增 4090 一键验收、环境采集、报告图表生成脚本与 `experiment_protocol.md`。
+5. 在 RTX 3060 Laptop / CUDA 12.9.86 上完成编译、12/12 单测、质量扫描和五次延迟
+   统计，验证新链路；正式 4090 mean/stddev 仍需按手册重采。
+
+---
+
+# F. Moore Threads 实机验证与构建加固（2026-09-15）
+
+1. 在 MTT S4000 / MUSA 5.1.0 上完成干净构建、12/12 单测、256p/1080p 三版本
+   CPU 对照、48 组合矩阵、RGB/base 十次统计及质量扫描，全部 PASS；
+2. 原 `results/unverified/moore_threads.txt` 已由真实结果目录
+   `results/moore_s4000_musa5.1/` 替代；当时 MetaX/Iluvatar 仍保留 PENDING；
+3. Makefile 新增可覆盖的 `MUSA_HOME/MCC`，移除发行版特定 GCC 库路径，并将
+   `${MUSA_HOME}/lib` 写入 RUNPATH；同时把 Host/kernel 对象及实际可执行文件全部按
+   `PLATFORM` 隔离，由 `make build` 刷新公共 `build/nlm_denoise` 入口。
+   在清除 PATH/LD_LIBRARY_PATH 后重新构建、入口字节比对、运行及增量构建均通过；
+4. `collect_environment.sh`、`run_quality_sweep.sh` 支持 `PLATFORM=moore`，新增
+   `run_reproducible_moore.sh` 与 S4000 性能图表生成入口；
+5. 服务器镜像无 profiler CLI，本轮只记录该限制，不把 NVIDIA Nsight 数据当作
+   Moore 实测数据。
+6. S4000 日志发现默认 `make test` 被一个空格误判为 verbose；移除 `$(if ...)` 的
+   空白 false 分支后，默认模式只执行 12/12 单测，`VERBOSE=true` 才附加 256p GPU
+   校验，两条路径均在 S4000 上回归通过。
+
+---
+
+# G. MetaX C500 实机验证与 MACA 构建加固（2026-09-15）
+
+1. 曦云实例实际设备为 MetaX C500 25% sGPU（16 GB 配额），工具链为 MACA
+   3.0.0.8 / mxcc 1.0.0；按实际设备选择 `PLATFORM=metax`，不将平台商品名误写为
+   Iluvatar/CoreX。
+2. 原样干净构建设备端报 `cuda_runtime.h` 不可见；仅补 include 后链接又报
+   `wcuda*` 未定义。Makefile 因此新增可覆盖的 `MACA_HOME/MACA_CUDA/MXCC`，接入
+   cu-bridge include，显式链接 `libruntime_cu`/`libsymbol_cu` 并写入 RUNPATH。
+3. 修正版完成干净构建、默认/verbose 单测、256p/1080p 三版本 CPU 对照、
+   RGB/base 十次统计、CPU 三次独立基线、48 个唯一配置与质量扫描，全部 PASS；真实证据替换
+   `results/unverified/metax.txt`，归档到 `results/metax_c500_maca3.0/`。
+4. MetaX 结果揭示平台相关优化回退：base/pr=3 时 V1 为 418.397 ms，V2 为
+   1488.151 ms，V2 慢 3.56×；文档和 FAQ 改为按平台实测选择 kernel，C500 推荐 V1。
+5. 使用 MACA 原生 mcTracer 3.0.0.8 采集 1080p V1 时间线；NLM 占求和设备事件
+   99.617%。报告脚本新增 mcTracer JSON 图和多 CSV 质量—延迟输入支持。
+
+---
+
+# H. Iluvatar MR-V100 实机验证与 CoreX 构建加固（2026-09-15 至 2026-09-16）
+
+1. 在 Iluvatar MR-V100 32 GB、CoreX/驱动 4.4.0、CUDA 兼容层 10.2 上完成原始
+   Makefile 干净构建，确认既有 `-x ivcore` 入口可用；
+2. Makefile 新增可覆盖的 `COREX_HOME/COREX_CXX`，并把 `${COREX_HOME}/lib64`
+   写入 RUNPATH；参数化版本再次完成干净构建、`ldd` 解析和默认/verbose 单测；
+3. 完成 256p/1080p 三版本 CPU 对照、RGB/base warmup=3/repeat=10、CPU 三次基线、
+   48 个唯一配置与质量扫描，全部 PASS；三版本输出 PNG 的 SHA-256 完全一致；
+4. 1080p RGB/base 的 V2 kernel/e2e 为 716.595/721.346 ms，对同机 CPU 加速
+   322.75×；4K V2 为 2869.991/2888.719 ms。数据归档至
+   `results/iluvatar_mrv100_corex4.4.0/`；
+5. 新增 `run_reproducible_iluvatar.sh`，扩展环境采集器和三张报告图。镜像未提供
+   ixprof/nsys/ncu CLI，故只保留工具探测日志及程序内事件计时，不伪造原生 trace。

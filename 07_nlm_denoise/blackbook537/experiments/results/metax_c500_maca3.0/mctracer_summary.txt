@@ -1,0 +1,24 @@
+events 48
+ph Counter({'X': 33, 'f': 9, 's': 5, 'M': 1})
+cats Counter({None: 24, 'Launch': 14, '0': 9, '__metadata': 1})
+names
+Launch 14
+memset 4
+mcMalloc 4
+mcFree 4
+mcLaunchKernel 3
+mcMemcpy 2
+mcEventCreate 2
+mcEventRecord 2
+mcEventDestroy 2
+process_name 1
+memcpy HTOD(pinned,device) 1
+nlm::CvtU8ToF32PlanarKernel(unsigned char const*, float*, int, int, int) 1
+mcGetDevice 1
+mcGetDeviceProperties 1
+mcGetDeviceCount 1
+nlm::NlmSmemKernel(float const*, float*, int, int, int, NlmParamsDev) 1
+mcEventSynchronize 1
+mcEventElapsedTime 1
+nlm::CvtF32ToU8InterleavedKernel(float const*, unsigned char*, int, int, int) 1
+memcpy DTOH(device,pageable) 1

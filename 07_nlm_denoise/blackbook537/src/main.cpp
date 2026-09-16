@@ -4,8 +4,10 @@
 // 子命令：
 //   run      -i input.png -o output.png -p params/default.txt [--kernel v] [--log f]
 //   validate -i input.png [-o output.png] -p params/default.txt
-//   bench    [--sizes 1920x1080,3840x2160] [--channels 1,3] [--log bench.csv]
-//            [--warmup 3] [--repeat 10] [--with-cpu]
+//   bench    [--sizes 1920x1080,3840x2160] [--channels 1,3]
+//            [--param-sets all|small,base,strong-h,large] [--log results.csv]
+//            [--warmup 3] [--repeat 10] [--with-cpu] [--cpu-repeat 1]
+//   metrics  --reference clean.png --test output.png [--label name] [--log quality.csv]
 //   gen      -o noisy.png [--size 1920x1080] [--channels 3] [--sigma 25] [--seed 1]
 //   units    （Host 侧单元测试，无需 GPU）
 // ============================================================================
@@ -31,6 +33,7 @@ void PrintUsage() {
         "  run       对单张图像执行 GPU NLM 降噪并输出性能日志\n"
         "  validate  与 CPU 参考（及可选 OpenCV）对比，输出 MAE/PSNR 校验\n"
         "  bench     分辨率 x 通道 x 参数组合 x kernel 版本性能扫描（CSV）\n"
+        "  metrics   计算测试图相对参考图的 MAE/PSNR，可追加写入 CSV\n"
         "  gen       生成合成含噪测试图\n"
         "  units     运行 Host 侧单元测试（无需 GPU）\n"
         "\n"
@@ -40,7 +43,20 @@ void PrintUsage() {
         "  -p <file>     参数文件（默认 params/default.txt）\n"
         "  --kernel <v>  kernel 版本 0=naive 1=smem 2=smem+unroll（默认 2）\n"
         "  --log <file>  性能日志文件（默认 data/logs/nlm_perf.log，追加写）\n"
-        "  --with-cpu    同时运行 CPU 参考以计算加速比（大图较慢）\n"
+        "  --with-cpu    同时运行 CPU 参考以计算加速比\n"
+        "\n"
+        "bench 选项:\n"
+        "  --sizes <list>      尺寸列表（默认 1920x1080）\n"
+        "  --channels <list>   1,3（默认 1,3）\n"
+        "  --cpu-repeat <n> CPU 重复次数（默认 1）\n"
+        "  --param-sets <list> all 或 small,base,strong-h,large（默认 all）\n"
+        "  --with-cpu          CPU 统计（仅支持不超过 1080p）\n"
+        "\n"
+        "metrics 选项:\n"
+        "  --reference <file>  干净参考图（必填）\n"
+        "  --test <file>       待评估图（必填）\n"
+        "  --label <name>      CSV 行标签（默认 unnamed）\n"
+        "  --log <file>        可选 CSV 输出\n"
         "\n"
         "gen 选项:\n"
         "  -o <file>     输出图像（缺省按规范自动命名：data/noisy/noisy_<尺寸>_<c>ch_sigma<σ>.png）\n");
@@ -188,10 +204,21 @@ int main(int argc, char** argv) {
     } else if (cmd == "bench") {
         return RunBenchmark(GetArg(args, "--sizes", "1920x1080"),
                             GetArg(args, "--channels", "1,3"),
-                            GetArg(args, "--log", "bench.csv"),
+                            GetArg(args, "--param-sets", "all"),
+                            GetArg(args, "--log", "experiments/results/current/benchmark.csv"),
                             std::atoi(GetArg(args, "--warmup", "3").c_str()),
                             std::atoi(GetArg(args, "--repeat", "10").c_str()),
-                            args.count("--with-cpu") > 0);
+                            args.count("--with-cpu") > 0,
+                            std::atoi(GetArg(args, "--cpu-repeat", "1").c_str()));
+    } else if (cmd == "metrics") {
+        const std::string reference = GetArg(args, "--reference", "");
+        const std::string test = GetArg(args, "--test", "");
+        if (reference.empty() || test.empty()) {
+            std::fprintf(stderr, "[metrics] 必须指定 --reference 与 --test\n");
+            return 2;
+        }
+        return RunMetrics(reference, test, GetArg(args, "--label", "unnamed"),
+                          GetArg(args, "--log", ""));
     } else if (cmd == "gen") {
         return CmdGen(args);
     } else if (cmd == "units") {

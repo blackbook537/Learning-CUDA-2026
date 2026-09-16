@@ -2,7 +2,9 @@
 
 > "巡天"深空探测影像机载降噪模块：在 GPU 上实现可配置、可验证、可分析性能瓶颈的
 > Non-Local Means（NLM）图像降噪，支持灰度/RGB、1080p 基准与 4K 进阶处理，
-> 一套代码多平台编译（NVIDIA / 天数 CoreX / 沐曦 MACA / 摩尔 MUSA）。
+> NVIDIA 路径已在 RTX 3060 Laptop 与 RTX 4090 D 实测；国产平台已在 Iluvatar
+> MR-V100 / CoreX 4.4.0、MTT S4000 / MUSA 5.1、MetaX C500 25% sGPU /
+> MACA 3.0 完成全流程实测。
 
 ![平台](https://img.shields.io/badge/platform-NVIDIA%20%7C%20Iluvatar%20%7C%20MetaX%20%7C%20Moore-blue)
 ![标准](https://img.shields.io/badge/C%2B%2B-17%20%2F%2011(MUSA)-green)
@@ -43,7 +45,7 @@ w(p,q) = exp( -max(dist(P_p,P_q) - 2·σ²·N_patch, 0) / h² )
   边界    : 每次访问坐标独立 clamp（等价 OpenCV BORDER_REPLICATE）
 ```
 
-算法计算量极大（1080p RGB 基线单帧约 4.5×10¹⁰ 次乘加），本项目通过三级渐进式 GPU 优化（naive → shared memory → 模板展开）将对单线程 CPU 参考的加速比提升至约 **400×**。
+算法计算量极大（1080p RGB 基线单帧约 4.5×10¹⁰ 次乘加），本项目通过三级渐进式 GPU 优化（naive → shared memory → 模板展开）；RTX 4090 D 上相对单线程 CPU 参考实测约 **2838×**。
 
 ## 核心功能
 
@@ -52,89 +54,83 @@ w(p,q) = exp( -max(dist(P_p,P_q) - 2·σ²·N_patch, 0) / h² )
 | 单图降噪 | `run` | GPU NLM 降噪，输出同格式图像 + 性能日志（ms / Mpx/s / 加速比） |
 | 正确性校验 | `validate` | 三个 kernel 版本逐一对比 CPU 参考，MAE/PSNR 判定，退出码可接 CI |
 | 性能基准 | `bench` | 分辨率 × 通道 × 参数组合 × kernel 版本扫描，输出 CSV |
+| 图像指标 | `metrics` | 对参考图与测试图计算 MAE/PSNR，结果可追加到 CSV |
 | 测试图生成 | `gen` | 合成"渐变纹理 + 可控噪声"测试图，零素材端到端验证 |
 | 单元测试 | `units` | 12 项 Host 侧测试（无需 GPU） |
 
 **三级优化 kernel**（`--kernel 0/1/2`）：
 
-| 版本 | 技术手段 | 1080p RGB 基线实测 |
+| 版本 | 技术手段 | RTX 4090 D、1080p RGB kernel 实测 |
 |---|---|---|
-| V0 naive | 1 线程 = 1 像素，全全局内存 | 798 ms |
-| V1 smem | halo tile 协同加载 shared memory，patch 距离全命中 smem | 369 ms |
-| V2 unroll | V1 + patch 半径模板化全展开（pr≤3 自适应分派） | **348 ms** |
+| V0 naive | 1 线程 = 1 像素，全全局内存 | 125.91 ms |
+| V1 smem | halo tile 协同加载 shared memory，patch 距离全命中 smem | 58.90 ms |
+| V2 unroll | V1 + patch 半径模板化全展开（pr≤3 自适应分派） | **57.73 ms** |
 
 工程特性：smem 需求超设备上限自动回退 naive；输出 bit 级确定（无原子加）；
 pr=4 展开回归已按实测修正；`__expf` 近似为可关断编译开关。
 
 ## 性能速览
 
-> 验证机：RTX 3060 Laptop（sm_86），CUDA 12.9；warmup=3、repeat=10、kernel_ms 取最小值。
-> 完整 48 组数据：[bench.csv](bench.csv)；实测结果汇总：[nvidia_result.txt](nvidia_result.txt)
+> 主验证机：RTX 4090 D（sm_89），CUDA 12.8；以下是 2026-09-07 历史实测的
+> kernel 最小值。原始数据与环境见
+> [experiments/results/rtx4090d](experiments/results/rtx4090d/)。
 
 | 配置 | V0 | V1 | V2 | V2 吞吐 | V2 vs V0 |
 |---|---|---|---|---|---|
-| 1080p 灰度 base | 422.2 ms | 197.3 ms | **152.2 ms** | 13.6 Mpx/s | 2.8× |
-| 1080p RGB base | 870.9 ms | 365.1 ms | **354.0 ms** | 5.9 Mpx/s | 2.5× |
-| 4K 灰度 base | 2017.4 ms | 878.6 ms | **693.9 ms** | 12.0 Mpx/s | 2.9× |
-| 4K RGB base | 3771.6 ms | 1706.9 ms | **1659.5 ms** | 5.0 Mpx/s | 2.3× |
+| 1080p 灰度 base | 72.02 ms | 31.40 ms | **26.99 ms** | 76.8 Mpx/s | 2.67× |
+| 1080p RGB base | 125.91 ms | 58.90 ms | **57.73 ms** | 35.9 Mpx/s | 2.18× |
+| 4K 灰度 base | 286.95 ms | 124.66 ms | **106.37 ms** | 78.0 Mpx/s | 2.70× |
+| 4K RGB base | 502.12 ms | 235.93 ms | **229.22 ms** | 36.2 Mpx/s | 2.19× |
 
-> 注：笔记本 GPU 存在会话间温度/频率波动（±15% 属正常）；数值以 bench.csv 当次采集为准。
+正确性（1080p RGB 基线 validate）：三版本对 CPU 参考 **MAE = 0.0000、PSNR = inf**；
+CPU 参考 174.535 s，V2 GPU 端到端 61.489 ms，对应约 **2838×**。
 
-正确性（1080p RGB 基线 validate）：三版本对 CPU 参考 **MAE = 0.0000、PSNR = inf**（bit 级一致），CPU 参考耗时 148.9 s → 加速比约 **428×**。
+Moore Threads MTT S4000 / MUSA 5.1 也已完成全流程实测。1080p RGB/base 的 V2
+kernel/e2e 均值为 **467.985/471.324 ms**，对同机 CPU 参考加速 **396.20×**；
+4K RGB/base 为 **1842.982/1873.327 ms**。三版本对 CPU 均 MAE=0，完整 48 组合
+矩阵无失败。原始证据见
+[experiments/results/moore_s4000_musa5.1](experiments/results/moore_s4000_musa5.1/)。
+
+MetaX C500 25% sGPU / MACA 3.0 也已完成同一流程。1080p RGB/base 的最优版本
+是 **V1**：kernel/e2e 均值 **418.397/420.733 ms**，对同机三次 CPU 参考加速
+**426.87×**；4K 为 **1645.636/1655.068 ms**。V2 在该平台反而比 V1 慢
+3.55–3.58×，详见
+[C500 结果目录](experiments/results/metax_c500_maca3.0/)。
+
+Iluvatar MR-V100 / CoreX 4.4.0 的同口径正式基准中，1080p RGB/base 的 V2
+kernel/e2e 均值为 **716.595/721.346 ms**，同机 CPU 三次均值 232.815 s，
+加速 **322.75×**；4K V2 为 **2869.991/2888.719 ms**。干净构建、12/12 单测、
+1080p 三版本 CPU 对照、48 个唯一配置和质量扫描全部通过，见
+[MR-V100 结果目录](experiments/results/iluvatar_mrv100_corex4.4.0/)。
+
+![RTX 4090 performance](docs/assets/performance_4090.png)
+
+![MTT S4000 performance](docs/assets/performance_moore_s4000.png)
+
+![MetaX C500 performance](docs/assets/performance_metax_c500.png)
+
+![Iluvatar MR-V100 performance](docs/assets/performance_iluvatar_mrv100.png)
+
+![Visual quality](docs/assets/quality_triptych.png)
 
 ## 项目结构
 
 ```text
-nlm_denoise_project/
-├── Makefile                      # 多平台构建（目标语义对齐 Learning-CUDA 仓库约定）
-├── LICENSE                       # MIT（与 Learning-CUDA 仓库一致）
-├── README.md                     # 本文档
-├── nvidia_result.txt             # NVIDIA 平台实测结果（真实运行输出）
-├── metaX_result.txt              # 沐曦平台结果（待实测占位）
-├── moore_result.txt              # 摩尔平台结果（待实测占位）
-├── bench.csv                     # 48 组实测性能数据（nvidia_result.txt 的完整数据源）
-├── include/                      # ★ 全部头文件（按接口层次分类）
-│   ├── nlm/                      #   对外接口层 —— 上层应用只需 include 此层
-│   │   ├── pipeline.h            #     GPU 降噪全流程 API（无状态纯函数）
-│   │   └── params.h              #     参数结构 + 参数文件解析
-│   ├── kernels/                  #   算子接口层 —— 设备资源管理与 kernel 调度
-│   │   └── kernels.h
-│   ├── pal/                      #   平台抽象层（PAL）—— 四平台运行时差异唯一收敛点
-│   │   └── platform_api.h
-│   ├── core/                     #   公共支撑层 —— 图像 IO / CPU 参考实现
-│   │   ├── image_io.h
-│   │   └── nlm_cpu_ref.h
-│   └── tester/                   #   测试支撑层 —— 质量指标与测试辅助
-│       └── utils.h
-├── src/                          # Host 侧实现（.cpp，与 include/ 层次一一对应）
-│   ├── main.cpp                  #   CLI 入口（run/validate/bench/gen/units）
-│   ├── params.cpp                #   参数解析与校验
-│   ├── image_io.cpp              #   PNG/JPG 编解码（stb_image）
-│   ├── pipeline.cpp              #   GPU 流程编排 + 计时 + 性能日志
-│   └── nlm_cpu_ref.cpp           #   CPU 参考实现（正确性基线）
-├── kernels/                      # ★ 设备侧算子（按 GPU/NPU 架构分类）
-│   ├── common/                   #   全平台 100% 共享的算法实现
-│   │   └── kernels_impl.inl      #     V0/V1/V2 全部 kernel + Host 调度
-│   ├── nvidia/kernels.cu         #   NVIDIA CUDA 编译单元（nvcc）
-│   ├── iluvatar/kernels.cu       #   天数 CoreX 编译单元（clang++ -x ivcore）
-│   ├── metax/kernels.maca        #   沐曦 MACA 编译单元（mxcc）
-│   └── moore/kernels.mu          #   摩尔 MUSA 编译单元（mcc，C++11 子集）
-├── tester/                       # 测试与基准实现
-│   ├── validate.cpp              #   正确性校验（vs CPU 参考 / OpenCV）
-│   ├── benchmark.cpp             #   性能基准（参数×分辨率×版本扫描）
-│   └── test_units.cpp            #   Host 单元测试（无需 GPU）
-├── build/                        # ★ 全部构建产物（make 生成；make clean 整体删除）
-│   ├── nlm_denoise               #   可执行文件
-│   └── obj/                      #   对象文件（按 src/ tester/ kernels/ 分层）
-├── params/default.txt            # 任务基线参数 pr=3 sr=10 h=10 sigma=25
-├── data/                         # ★ 数据集中管理（详见"数据管理"章节）
-│   ├── noisy/                    #   输入图像：含噪测试图（gen 合成或手动放置）
-│   ├── clean/                    #   参考图像：干净原图（质量评估基准）
-│   ├── output/                   #   降噪结果（run / validate -o 输出）
-│   └── logs/                     #   运行日志（nlm_perf.log，CSV 追加写）
-├── scripts/                      # 一键准入 / 结果生成 / ncu·nsys 采集 / 本地开发辅助
-├── docs/                         # summary_report / architecture_design / user_guide / refactor_log
-└── third_party/stb/              # stb_image / stb_image_write（单头文件，已随附）
+blackbook537/
+├── Makefile / README.md / LICENSE
+├── include/ src/ kernels/ tester/ third_party/   # 产品代码与测试
+├── params/default.txt                             # 默认运行参数
+├── data/{clean,noisy}/                            # 最小可复现输入数据
+├── experiments/
+│   ├── configs/                                   # small/base/large/sigma10/25/50
+│   ├── results/{rtx4090d,rtx3060_laptop,moore_s4000_musa5.1,metax_c500_maca3.0}/
+│   │                                               # 已验证原始结果
+│   ├── results/unverified/                        # 未经硬件验证的平台说明
+│   └── work/                                      # 运行期图像，不提交
+├── scripts/                                       # 环境采集、验收、质量/性能、profiling
+└── docs/
+    ├── experiment_protocol.md                     # 完整复现实验手册
+    └── assets/                                    # PR 可直接显示的压缩图表
 ```
 
 ### 文件存放规范
@@ -146,7 +142,7 @@ nlm_denoise_project/
 | 算法改动只碰共享实现 | 新增 kernel 版本（如 V3）只改 `kernels/common/kernels_impl.inl`，四个平台同步生效 |
 | 平台差异只进 PAL | 设备 API 差异只允许出现在 `include/pal/platform_api.h`，算法代码禁止直接调用平台原生 API |
 | 产物不落源码目录 | 编译产物（可执行文件、.o）只允许出现在 `build/`，`make clean` 一键清理 |
-| 数据只进 `data/` | 运行期图像与日志按阶段归位 `data/{noisy,clean,output,logs}/`，仓库根目录与源码目录不落数据文件 |
+| 数据与证据分离 | 输入样例进 `data/`；临时输出进 `experiments/work/`；可复核 CSV/日志进 `experiments/results/<device>/`；PR 图片进 `docs/assets/` |
 
 ## 安装步骤
 
@@ -155,14 +151,15 @@ nlm_denoise_project/
 | 组件 | 要求 |
 |---|---|
 | OS | Linux x86_64 |
-| 编译 | CUDA Toolkit ≥ 11.0、GNU Make |
-| GPU | NVIDIA 计算能力 ≥ 7.0（验证机 sm_86） |
-| 可选 | OpenCV 4.x（`validate` 交叉验证）；天数/沐曦/摩尔对应 SDK |
+| 编译 | NVIDIA：CUDA Toolkit ≥ 11.0；Iluvatar：CoreX 4.4；MetaX：MACA 3.0；Moore：MUSA Toolkit 5.1；GNU Make |
+| GPU | NVIDIA sm_86/sm_89、Iluvatar MR-V100、MetaX C500 25% sGPU、MTT S4000 MUSA cc 2.2 均已验证 |
+| 可选 | OpenCV 4.x（`validate` 交叉验证） |
 
 ### 构建
 
 ```bash
-git clone <Learning-CUDA 仓库> && cd nlm_denoise_project   # 或直接使用本目录
+git clone <Learning-CUDA 仓库>
+cd Learning-CUDA/07_nlm_denoise/blackbook537
 
 make                          # 构建并运行测试（同参考仓库约定：all = build + run）
 make build                    # 仅编译
@@ -172,13 +169,14 @@ make clean                    # 清理产物
 make test                     # 同 run（兼容别名）
 
 make PLATFORM=metax           # 沐曦 MACA（编译 kernels/metax/kernels.maca）
-make PLATFORM=moore           # 摩尔 MUSA（C++11 子集）
+make PLATFORM=moore           # 摩尔 MUSA（默认 MUSA_HOME=/usr/local/musa）
 make PLATFORM=iluvatar        # 天数 CoreX
 make WITH_OPENCV=1            # 附加 OpenCV 交叉验证
 make FAST_EXP=1               # 权重 __expf 近似开关（默认关，见 FAQ）
 ```
 
-构建产物为单可执行文件 `nlm_denoise`，无外部运行时依赖（stb 静态编译入二进制）。
+构建产物为单可执行文件 `nlm_denoise`；图像编解码由 stb 静态编入，运行时仍需目标
+GPU 驱动和对应的 CUDA/MUSA runtime。
 
 > **本地开发机（无系统级 CUDA 的 WSL 等）**：nvcc 不在 PATH 或系统 gcc 版本过新时，
 > 用变量覆盖而非改 Makefile：
@@ -188,6 +186,23 @@ make FAST_EXP=1               # 权重 __expf 近似开关（默认关，见 FAQ
 >      CUDA_RT=/path/to/cuda_runtime   # 含 include/ 与 lib/ 的 cudart 目录
 > ```
 > 或直接执行 `bash scripts/make_local_wsl.sh`（已按本机环境预置路径）。
+
+> **Moore Threads / MUSA**：Makefile 默认使用 `/usr/local/musa/bin/mcc`，并把
+> `/usr/local/musa/lib` 写入二进制 RUNPATH，不要求预先配置 PATH/LD_LIBRARY_PATH。
+> SDK 位于其他目录时执行
+> `make build PLATFORM=moore MUSA_HOME=/path/to/musa`。
+
+> **MetaX / MACA**：Makefile 默认使用 `/opt/maca`，从
+> `/opt/maca/tools/cu-bridge/include` 取 CUDA 兼容头，并把 `/opt/maca/lib` 写入
+> RUNPATH。SDK 位于其他目录时执行
+> `make build PLATFORM=metax MACA_HOME=/path/to/maca`；必要时同时覆盖
+> `MACA_CUDA=/path/to/cu-bridge MXCC=/path/to/mxcc`。
+
+> **Iluvatar / CoreX**：Makefile 默认使用 `/usr/local/corex/bin/clang++`，设备侧以
+> `-x ivcore --cuda-path=/usr/local/corex` 编译，并把 CoreX `lib64` 写入 RUNPATH。
+> SDK 位于其他目录时执行
+> `make build PLATFORM=iluvatar COREX_HOME=/path/to/corex`；必要时覆盖
+> `COREX_CXX=/path/to/clang++`。
 
 ## 配置指南
 
@@ -224,12 +239,22 @@ sigma = 25.0              # 噪声标准差估计，对于8位图像范围0-255
 #   ver  kernel(ms)  e2e(ms)   MAE(vsCPU)  PSNR(dB)  判定
 #   2    347.898     354.021   0.0000      inf       PASS
 
-# 4) 性能基准（CSV：size,channels,pr,sr,h,sigma,kernel_ver,kernel_ms,e2e_ms,mpx_s,cpu_ms,speedup）
+# 4) 性能基准（mean/min/stddev + CPU 统一口径）
 ./build/nlm_denoise bench --sizes 1920x1080,3840x2160 --channels 1,3 \
-                    --warmup 3 --repeat 10 --log bench.csv
+                    --param-sets all --warmup 3 --repeat 10 \
+                    --log experiments/results/current/benchmark.csv
 
-# 5) 一键准入检查
-bash scripts/run_all.sh
+# 5) RTX 4090 完整复现实验
+ARCH=sm_89 bash scripts/run_reproducible_4090.sh
+
+# 6) MTT S4000 / MUSA 完整复现实验
+MUSA_HOME=/usr/local/musa bash scripts/run_reproducible_moore.sh
+
+# 7) MetaX C500 / MACA 完整复现实验
+MACA_HOME=/opt/maca bash scripts/run_reproducible_metax.sh
+
+# 8) Iluvatar MR-V100 / CoreX 完整复现实验
+COREX_HOME=/usr/local/corex bash scripts/run_reproducible_iluvatar.sh
 ```
 
 各子命令完整选项表见 [docs/user_guide.md](docs/user_guide.md) 第 5 章。
@@ -261,7 +286,8 @@ bash scripts/run_all.sh
 - `SaveImage` 与日志写入前自动逐级创建父目录（`EnsureParentDir`），`-o data/output/xx.png` 无需手工建目录；
 - 数据流可一键验证：`bash scripts/check_dataflow_wsl.sh`（gen → run → validate 全链路 + 根目录清洁检查）。
 
-> `bench.csv`（48 组基准数据）为交付报告数据，保留仓库根级；其余运行期数据一律入 `data/`。
+> 正式实验输出统一写入 `experiments/results/<device>/`；临时生成图像写入
+> `experiments/work/` 并由 `.gitignore` 排除。
 
 ## API 文档
 
@@ -300,7 +326,7 @@ double ComputePSNR(const ImageU8& a, const ImageU8& b);
 |---|---|---|
 | 单元测试 | `./build/nlm_denoise units` | 参数解析、MAE/PSNR、CPU 参考不变式（常量恒等/确定性/极小图/降噪有效性），12 项全过 |
 | 集成校验 | `./build/nlm_denoise validate ...` | 三版本 GPU vs CPU 参考 MAE/PSNR（1080p 实测 MAE=0） |
-| 性能回归 | `./build/nlm_denoise bench ...` | 48 组配置 CSV，对比 bench.csv 基线 |
+| 性能回归 | `./build/nlm_denoise bench ...` | 统计 CSV，对比 `experiments/results/` 中同硬件基线 |
 | 数据流检查 | `bash scripts/check_dataflow_wsl.sh` | gen 自动命名 → run 入 data/output+logs → validate → 根目录清洁 |
 | 一键准入 | `bash scripts/run_all.sh` | 以上全部串联，任何一步失败即中断 |
 
@@ -317,7 +343,7 @@ double ComputePSNR(const ImageU8& a, const ImageU8& b);
    - 保持 C++11 子集兼容（摩尔线程平台）；风格与现有代码一致，重要逻辑配中文注释；
    - 所有 GPU API 调用经 `GPU_CHECK` 宏，错误经 `std::string* err` 上传，不裸 printf；
 4. **学术诚信**：禁止抄袭其他学员与开源实现（可讨论思路，禁止看/抄代码），一经发现成绩作废；
-5. **提交内容**：代码 + 测试 + 更新后的 bench.csv / 文档一并提交。
+5. **提交内容**：代码、测试、环境清单、原始 CSV/文本日志、复现实验手册及压缩图表一并提交。
 
 ## 常见问题解答
 
@@ -328,7 +354,9 @@ A：任务公式 `dist` 为 L2 距离之和（不做均值）、减项为 `2σ²
 A：8 位灰度或 RGB 的 PNG/JPG（RGBA 自动剥离 alpha）。pr≤8、sr≤32；smem 需求超设备上限时 V1/V2 自动回退 naive，功能不会失败（性能下降）。
 
 **Q：V2 一定比 V1 快吗？**
-A：pr≤3 快 5–30%；pr=4 全展开导致寄存器溢出（实测反降 70%），代码已按 bench 数据在 pr≥4 时自动退回 V1 路径，两版本耗时持平。
+A：不一定。NVIDIA/Moore/Iluvatar 的 pr≤3 实测通常更快，但 MetaX C500 上 base/pr=3 的
+V2 比 V1 慢约 3.55×；这是编译器/架构相关的模板展开回退。pr≥4 已在代码中自动
+退回 V1 路径；MetaX 当前建议显式使用 `--kernel 1`。
 
 **Q：`FAST_EXP=1` 值得开吗？**
 A：实测无性能收益（瓶颈在 patch FMA 而非 SFU 指数），近似误差低于 u8 量化阈值；默认关闭保留精确 `expf`，该开关主要用于报告的误差来源分析对照。
@@ -353,7 +381,9 @@ A：所有子命令退出码规范化（0 成功 / 1 质量不达标 / 2 运行�
 | [docs/architecture_design.md](docs/architecture_design.md) | 架构设计：需求基线、分层架构、优化路线、风险权衡 |
 | [docs/user_guide.md](docs/user_guide.md) | 详细讲解：运行实录、性能解读、FAQ、故障排除 |
 | [docs/refactor_log.md](docs/refactor_log.md) | 结构重构变更记录（对齐 Learning-CUDA 仓库约定） |
-| [nvidia_result.txt](nvidia_result.txt) | NVIDIA 平台实测结果（RTX 3060 Laptop：环境/测试/校验/基准，可复现） |
-| [nvidia_4090_result.txt](nvidia_4090_result.txt) | **RTX 4090 D 服务器全程验证结果**（构建/单测/校验/基准/质量/nsys profiling） |
-| [bench.csv](bench.csv) | 48 组实测性能数据（RTX 3060 Laptop） |
-| [bench_4090.csv](bench_4090.csv) | 48 组实测性能数据（RTX 4090 D） |
+| [docs/experiment_protocol.md](docs/experiment_protocol.md) | 实验环境、工具、命令、结果验收和截图生成流程 |
+| [experiments/results/rtx4090d](experiments/results/rtx4090d/) | **RTX 4090 D** 环境、测试、基准、质量及 nsys 原始证据 |
+| [experiments/results/rtx3060_laptop](experiments/results/rtx3060_laptop/) | RTX 3060 Laptop 开发机历史结果与补充实验 |
+| [experiments/results/metax_c500_maca3.0](experiments/results/metax_c500_maca3.0/) | MetaX C500 / MACA 3.0 完整实测、原始 CSV、日志与 mcTracer JSON |
+| [experiments/results/moore_s4000_musa5.1](experiments/results/moore_s4000_musa5.1/) | **MTT S4000 / MUSA 5.1** 环境、测试、基准和质量原始证据 |
+| [experiments/results/iluvatar_mrv100_corex4.4.0](experiments/results/iluvatar_mrv100_corex4.4.0/) | **Iluvatar MR-V100 / CoreX 4.4.0** 环境、测试、基准、质量和校验和 |

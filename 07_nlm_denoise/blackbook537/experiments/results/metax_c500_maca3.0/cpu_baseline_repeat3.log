@@ -1,0 +1,6 @@
+[bench] param_sets=base warmup=3 repeat=10 cpu_repeat=3 -> experiments/results/current/metax_c500/cpu_baseline_repeat3.csv
+[bench] CPU 1920x1080x3 base    : mean=179598.3 min=179467.8 std=100.1 ms
+[bench] 1920x1080x3 base     v0: kernel 795.540±1.129 ms e2e 797.894±1.162 ms 2.6 Mpx/s speedup=225.090527x
+[bench] 1920x1080x3 base     v1: kernel 418.397±0.014 ms e2e 420.733±0.049 ms 5.0 Mpx/s speedup=426.870254x
+[bench] 1920x1080x3 base     v2: kernel 1488.151±1.161 ms e2e 1490.697±1.160 ms 1.4 Mpx/s speedup=120.479420x
+[bench] 完成，CSV 已写入 experiments/results/current/metax_c500/cpu_baseline_repeat3.csv

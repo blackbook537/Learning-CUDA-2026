@@ -18,7 +18,7 @@ mkdir -p "$(dirname "${OUT}")"
     -DPLATFORM_NVIDIA ${EXTRA_DEFS:-} -Iinclude -Ithird_party/stb -I"$RT/include" \
     src/main.cpp src/params.cpp src/image_io.cpp src/pipeline.cpp \
     src/nlm_cpu_ref.cpp tester/validate.cpp tester/benchmark.cpp \
-    tester/test_units.cpp kernels/nvidia/kernels.cu \
+    tester/metrics.cpp tester/test_units.cpp kernels/nvidia/kernels.cu \
     -o "${OUT}" -L"$RT/lib" -lcudart_static -lpthread -ldl -lrt
 
 echo "构建完成: ${OUT}"

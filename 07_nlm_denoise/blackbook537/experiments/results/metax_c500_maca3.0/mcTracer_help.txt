@@ -1,0 +1,18 @@
+(Tracer): 23:01:54 [INFO ] Tracer startup
+(Tracer): 23:01:54 [INFO ] =====Help Info=====
+(Tracer): 23:01:54 [INFO ] ***** Version: 
+(Tracer): 23:01:54 [INFO ] *****         3.0.0.8-344bb3b
+(Tracer): 23:01:54 [INFO ] ***** Usage: 
+(Tracer): 23:01:54 [INFO ] *****         /opt/maca/bin/mcTracer <trace options> '[target commands]'
+(Tracer): 23:01:54 [INFO ] ***** Where: 
+(Tracer): 23:01:54 [INFO ] *****         <tracer options> specify trace behavior
+(Tracer): 23:01:54 [INFO ] *****         [target commands] are commands of target application
+(Tracer): 23:01:54 [INFO ] ***** Available tracer options: 
+(Tracer): 23:01:54 [INFO ] *****         --help: Print help info
+(Tracer): 23:01:54 [INFO ] *****         --debug: Enable debugging function
+(Tracer): 23:01:54 [INFO ] *****         --mctx: Enable mctx function
+(Tracer): 23:01:54 [INFO ] *****         --odname: Set the output folder name, followed by the corresponding name
+(Tracer): 23:01:54 [INFO ] *****         --name: Set the prefix of the output file name, default is tracer_out
+(Tracer): 23:01:54 [INFO ] *****         --attach: Enable attach mode, followed by the corresponding pid, press 'ctrl+t' to stop attach
+(Tracer): 23:01:54 [INFO ] ***** Usage example: 
+(Tracer): 23:01:54 [INFO ] *****         /opt/maca/bin/mcTracer --mctx ./hello_world hello_args1 --helo_args2=... 

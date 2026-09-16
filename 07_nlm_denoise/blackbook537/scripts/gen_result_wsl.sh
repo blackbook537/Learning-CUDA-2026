@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# 重构后全量验证 + 生成 nvidia_result.txt（真实运行输出）：
+# 本机 WSL 快速验证并生成结构化文本记录（真实运行输出）：
 #   1) make run VERBOSE=true   —— 验证新 Makefile 目标语义（units + GPU 端到端校验）
 #   2) validate 512x512 RGB    —— 三版本 vs CPU 参考 MAE/PSNR
-#   3) bench 快速抽样          —— 确认基准链路正常（完整数据见 bench.csv）
+#   3) bench 快速抽样          —— 确认基准链路正常（历史数据见 experiments/results/）
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-OUT=nvidia_result.txt
+OUT="${OUT:-experiments/results/current/run_all_wsl.txt}"
+mkdir -p "$(dirname "${OUT}")"
 {
 echo "==============================================================="
-echo " nlm_denoise —— NVIDIA 平台实测结果（nvidia_result.txt）"
+echo " nlm_denoise —— NVIDIA 平台实测结果"
 echo " 生成方式: bash scripts/gen_result_wsl.sh（可复现）"
 echo "==============================================================="
 echo
@@ -37,12 +38,14 @@ echo
 echo "==============================================================="
 echo "[3] 性能基准抽样（640x360，完整 48 组数据见 bench.csv）"
 echo "==============================================================="
-./build/nlm_denoise bench --sizes 640x360 --channels 1,3 --warmup 1 --repeat 3 --log /tmp/nlm_res_bench.csv
+./build/nlm_denoise bench --sizes 640x360 --channels 1,3 --param-sets all \
+  --warmup 1 --repeat 3 --log /tmp/nlm_res_bench.csv
 echo
-echo "----- bench.csv 摘要（RTX 3060 Laptop 实测，warmup=3 repeat=10）-----"
-head -1 bench.csv
-grep -E '^1920x1080,(1|3),3,10,10,25,' bench.csv
-grep -E '^3840x2160,(1|3),3,10,10,25,' bench.csv
+echo "----- 历史 benchmark 摘要（RTX 3060 Laptop，warmup=3 repeat=10）-----"
+LEGACY=experiments/results/rtx3060_laptop/benchmark_legacy.csv
+head -1 "${LEGACY}"
+grep -E '^1920x1080,(1|3),3,10,10,25,' "${LEGACY}"
+grep -E '^3840x2160,(1|3),3,10,10,25,' "${LEGACY}"
 } | tee "$OUT"
 
 echo "已生成 $OUT"

@@ -1,2 +1,5 @@
 # 文本文件统一 LF，二进制（PNG 等）由 git 自动识别，不转换
 * text=auto eol=lf
+
+# 实机原始日志按采集结果原样保存；不把设备 CLI 自带的行尾空格当作源码问题。
+experiments/results/** -whitespace

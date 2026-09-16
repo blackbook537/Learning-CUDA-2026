@@ -1,0 +1,10 @@
+[bench] param_sets=base warmup=3 repeat=10 cpu_repeat=3 -> experiments/results/current/iluvatar_mrv100_corex4.4.0/benchmark_base.csv
+[bench] CPU 1920x1080x3 base    : mean=232814.6 min=232737.4 std=63.3 ms
+[bench] 1920x1080x3 base     v0: kernel 1561.032±1.772 ms e2e 1565.984±1.812 ms 1.3 Mpx/s speedup=148.669820x
+[bench] 1920x1080x3 base     v1: kernel 779.246±7.910 ms e2e 783.766±8.029 ms 2.7 Mpx/s speedup=297.045957x
+[bench] 1920x1080x3 base     v2: kernel 716.595±9.802 ms e2e 721.346±9.947 ms 2.9 Mpx/s speedup=322.750062x
+[bench] CPU 3840x2160x3 base    : 跳过（超过 1080p 安全上限）
+[bench] 3840x2160x3 base     v0: kernel 6157.025±6.053 ms e2e 6176.088±6.140 ms 1.3 Mpx/s
+[bench] 3840x2160x3 base     v1: kernel 3100.127±20.517 ms e2e 3118.679±20.577 ms 2.7 Mpx/s
+[bench] 3840x2160x3 base     v2: kernel 2869.991±42.442 ms e2e 2888.719±42.348 ms 2.9 Mpx/s
+[bench] 完成，CSV 已写入 experiments/results/current/iluvatar_mrv100_corex4.4.0/benchmark_base.csv

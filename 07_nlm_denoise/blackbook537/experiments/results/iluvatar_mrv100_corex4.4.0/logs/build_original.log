@@ -1,0 +1,16 @@
+=== Cleaning temporary files (build/) ===
+rm -rf build
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c src/main.cpp -o build/obj/iluvatar/src/main.o
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c src/params.cpp -o build/obj/iluvatar/src/params.o
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c src/image_io.cpp -o build/obj/iluvatar/src/image_io.o
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c src/pipeline.cpp -o build/obj/iluvatar/src/pipeline.o
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c src/nlm_cpu_ref.cpp -o build/obj/iluvatar/src/nlm_cpu_ref.o
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c tester/validate.cpp -o build/obj/iluvatar/tester/validate.o
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c tester/benchmark.cpp -o build/obj/iluvatar/tester/benchmark.o
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c tester/metrics.cpp -o build/obj/iluvatar/tester/metrics.o
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c tester/test_units.cpp -o build/obj/iluvatar/tester/test_units.o
+=== Compiling kernels (kernels/iluvatar/kernels.cu) ===
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -x ivcore --cuda-path=/usr/local/corex -DPLATFORM_ILUVATAR -Iinclude -Ithird_party/stb -c kernels/iluvatar/kernels.cu -o build/obj/iluvatar/kernels/kernels.o
+=== Linking executable (build/iluvatar/nlm_denoise, iluvatar) ===
+clang++ -std=c++17 -O3 -I/usr/local/corex/include -fPIC -DPLATFORM_ILUVATAR -o build/iluvatar/nlm_denoise build/obj/iluvatar/src/main.o build/obj/iluvatar/src/params.o build/obj/iluvatar/src/image_io.o build/obj/iluvatar/src/pipeline.o build/obj/iluvatar/src/nlm_cpu_ref.o build/obj/iluvatar/tester/validate.o build/obj/iluvatar/tester/benchmark.o build/obj/iluvatar/tester/metrics.o build/obj/iluvatar/tester/test_units.o build/obj/iluvatar/kernels/kernels.o -lcudart -L/usr/local/corex/lib64
+=== Selected build/iluvatar/nlm_denoise -> build/nlm_denoise ===

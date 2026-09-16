@@ -11,7 +11,10 @@
 #   PLATFORM=nvidia|iluvatar|metax|moore   目标平台（默认 nvidia）
 #   WITH_OPENCV=1                          validate 增加 OpenCV 交叉验证
 #   FAST_EXP=1                             NLM 权重使用 __expf 快速指数（近似，报告需注明）
-#   NVCC/CXX_HOST/CUDA_RT/ARCH             本地开发机覆盖（见 README 安装步骤）
+#   NVCC/CXX_HOST/CUDA_RT/ARCH             NVIDIA 本地环境覆盖（见 README 安装步骤）
+#   COREX_HOME/COREX_CXX                   天数 CoreX SDK 与 clang++ 路径
+#   MACA_HOME/MACA_CUDA/MXCC                沐曦 MACA SDK、CUDA 兼容层与编译器路径
+#   MUSA_HOME/MCC                           Moore Threads MUSA SDK 与编译器路径
 #
 # 目录约定（详见 README 目录结构章节）：
 #   include/   全部头文件（nlm=对外接口 kernels=算子接口 pal=平台抽象
@@ -40,6 +43,13 @@ NVCC        ?= nvcc
 CXX_HOST    ?=
 CUDA_RT     ?=
 ARCH        ?=
+COREX_HOME  ?= /usr/local/corex
+COREX_CXX   ?= $(COREX_HOME)/bin/clang++
+MUSA_HOME   ?= /usr/local/musa
+MCC         ?= $(MUSA_HOME)/bin/mcc
+MACA_HOME   ?= /opt/maca
+MACA_CUDA   ?= $(MACA_HOME)/tools/cu-bridge
+MXCC        ?= $(MACA_HOME)/mxgpu_llvm/bin/mxcc
 
 SUFFIX          := cu
 PLATFORM_DEFINE := -DPLATFORM_NVIDIA
@@ -61,21 +71,29 @@ ifeq ($(PLATFORM),nvidia)
         CFLAGS += -arch=$(ARCH)
     endif
 else ifeq ($(PLATFORM),iluvatar)
-    CC              := clang++
-    CFLAGS          := -std=c++17 -O3 -I/usr/local/corex/include -fPIC
-    COMP_ONLY_FLAGS := -x ivcore --cuda-path=/usr/local/corex
+    CC              := $(COREX_CXX)
+    CFLAGS          := -std=c++17 -O3 -I$(COREX_HOME)/include -fPIC
+    COMP_ONLY_FLAGS := -x ivcore --cuda-path=$(COREX_HOME)
     PLATFORM_DEFINE := -DPLATFORM_ILUVATAR
-    EXTRA_LIBS      := -lcudart -L/usr/local/corex/lib64
+    EXTRA_LIBS      := -L$(COREX_HOME)/lib64 -Wl,-rpath,$(COREX_HOME)/lib64 -lcudart
 else ifeq ($(PLATFORM),metax)
-    CC              := mxcc
+    CC              := $(MXCC)
+    CFLAGS          := -std=c++17 -O3 -I$(MACA_CUDA)/include
     SUFFIX          := maca
     PLATFORM_DEFINE := -DPLATFORM_METAX
+    # MACA 3.x 的 CUDA 兼容头位于 cu-bridge；将设备对象单独链接时还需
+    # 显式链接 wcuda 符号实现。rpath 使产物无需额外设置 LD_LIBRARY_PATH。
+    EXTRA_LIBS      := -L$(MACA_HOME)/lib -Wl,-rpath,$(MACA_HOME)/lib \
+                       -lruntime_cu -lsymbol_cu
 else ifeq ($(PLATFORM),moore)
-    CC              := mcc
+    CC              := $(MCC)
     CFLAGS          := -std=c++11 -O3
     SUFFIX          := mu
     PLATFORM_DEFINE := -DPLATFORM_MOORE
-    EXTRA_LIBS      := -I/usr/local/musa/include -L/usr/lib/gcc/x86_64-linux-gnu/11/ -L/usr/local/musa/lib -lmusart
+    # rpath 让构建产物在未手工设置 LD_LIBRARY_PATH 时也能找到 libmusart；
+    # 避免绑定发行版特定的 GCC 目录，mcc 会自行选择兼容的 Host 工具链。
+    EXTRA_LIBS      := -I$(MUSA_HOME)/include -L$(MUSA_HOME)/lib \
+                       -Wl,-rpath,$(MUSA_HOME)/lib -lmusart
 else
     $(error Unsupported PLATFORM '$(PLATFORM)' (expected: nvidia, iluvatar, metax, moore))
 endif
@@ -93,17 +111,19 @@ endif
 # -------------------------------
 # Sources & Objects
 # -------------------------------
-TARGET      := build/nlm_denoise
-OBJ_DIR     := build/obj
+TARGET          := build/nlm_denoise
+PLATFORM_TARGET := build/$(PLATFORM)/nlm_denoise
+# Host 与 kernel 对象都按平台隔离，避免不 clean 直接切换 PLATFORM 时复用错误对象。
+OBJ_DIR     := build/obj/$(PLATFORM)
 INCLUDES    := -Iinclude -Ithird_party/stb
 
 HOST_SRCS   := src/main.cpp src/params.cpp src/image_io.cpp src/pipeline.cpp \
                src/nlm_cpu_ref.cpp tester/validate.cpp tester/benchmark.cpp \
-               tester/test_units.cpp
+               tester/metrics.cpp tester/test_units.cpp
 KER_SRC     := kernels/$(PLATFORM)/kernels.$(SUFFIX)
 HOST_OBJS   := $(addprefix $(OBJ_DIR)/,$(HOST_SRCS:.cpp=.o))
-# kernel 对象按平台目录隔离：切换 PLATFORM 自动触发重编，避免跨平台复用旧对象
-KER_OBJ     := $(OBJ_DIR)/kernels/$(PLATFORM)/kernels.o
+# OBJ_DIR 已含平台名；切换 PLATFORM 会自动重编 Host 与 kernel 对象。
+KER_OBJ     := $(OBJ_DIR)/kernels/kernels.o
 OBJS        := $(HOST_OBJS) $(KER_OBJ)
 
 # Tester's actual verbose argument (e.g., --verbose, -v)
@@ -116,7 +136,7 @@ VERBOSE          :=
 # -------------------------------
 # Translates `VERBOSE=true` (case-insensitive) to the tester's verbose flag.
 # If VERBOSE is not "true" (or empty), no flag is passed.
-VERBOSE_ARG := $(if $(filter true True TRUE, $(VERBOSE)), $(TEST_VERBOSE_FLAG), )
+VERBOSE_ARG := $(if $(filter true True TRUE,$(VERBOSE)),$(TEST_VERBOSE_FLAG))
 
 # -------------------------------
 # Phony Targets
@@ -126,11 +146,13 @@ VERBOSE_ARG := $(if $(filter true True TRUE, $(VERBOSE)), $(TEST_VERBOSE_FLAG), 
 # Default target: Build + run tests (non-verbose)
 all: build run
 
-# Build target: Compile application (kernels + host modules)
-build: $(TARGET)
+# Build target: compile a platform-specific binary, then refresh the stable CLI path.
+build: $(PLATFORM_TARGET)
+	@cp -f $(PLATFORM_TARGET) $(TARGET)
+	@echo "=== Selected $(PLATFORM_TARGET) -> $(TARGET) ==="
 
 # Run target: Execute test suite (supports `VERBOSE=true` for verbose output)
-run: $(TARGET)
+run: build
 	@echo "=== Running tests (output from $(TARGET)) ==="
 	@# Show verbose mode status (friendly for users)
 	@if [ -n "$(VERBOSE_ARG)" ]; then \
@@ -156,10 +178,10 @@ clean:
 # -------------------------------
 # Dependency Rules (Core Logic)
 # -------------------------------
-# Generate executable: Link kernels + host modules + tester modules
-$(TARGET): $(OBJS)
+# Generate platform-specific executable: link kernels + host modules + tester modules.
+$(PLATFORM_TARGET): $(OBJS)
 	@mkdir -p $(dir $@)
-	@echo "=== Linking executable ($(TARGET), $(PLATFORM)) ==="
+	@echo "=== Linking executable ($(PLATFORM_TARGET), $(PLATFORM)) ==="
 	$(CC) $(CFLAGS) $(PLATFORM_DEFINE) -o $@ $(OBJS) $(EXTRA_LIBS)
 
 # Host 侧对象：src/**.cpp 与 tester/**.cpp → build/obj/{src,tester}/**.o

@@ -10,7 +10,7 @@ GPU      : NVIDIA GeForce RTX 4090 D（compute capability 8.9 / sm_89），24564
 驱动     : 570.124.06
 CUDA     : release 12.8, V12.8.61（/usr/local/cuda -> cuda-12.8）
 主机     : Docker 容器（/.dockerenv 存在），128 vCPU
-构建命令 : make PLATFORM=nvidia ARCH=sm_89（Makefile 默认 ARCH=sm_89，与 4090 匹配，无需改动）
+构建命令 : make PLATFORM=nvidia ARCH=sm_89（ARCH 必须显式传入；Makefile 默认留空）
 Profiler : Nsight Systems 2024.6.2.225（可用）
            Nsight Compute 2025.1.0.0（已安装，但计数器权限被宿主限制，见 [6]）
 
@@ -58,7 +58,7 @@ ver    kernel(ms)   e2e(ms)      MAE(vsCPU)   PSNR(dB)   判定
 
 ===============================================================
 [4] 性能基准（bench，48 组 = 2 分辨率 × 2 通道 × 4 参数 × 3 版本）
-     warmup=3, repeat=10, kernel_ms 取最小值；完整数据见 bench_4090.csv
+     warmup=3, repeat=10, kernel_ms 取最小值；完整数据见 benchmark_legacy.csv
 ===============================================================
 kernel 耗时（ms）与吞吐量（Mpx/s）：
 

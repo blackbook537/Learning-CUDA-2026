@@ -1,0 +1,34 @@
+[bench] param_sets=all warmup=3 repeat=10 cpu_repeat=1 -> experiments/results/moore_s4000_musa5.1/benchmark_256.csv
+[bench] CPU 256x256x1 small   : mean=1359.7 min=1359.7 std=0.0 ms
+[bench] 256x256x1 small    v0: kernel 4.208±0.001 ms e2e 4.539±0.008 ms 15.6 Mpx/s speedup=299.536464x
+[bench] 256x256x1 small    v1: kernel 1.954±0.001 ms e2e 2.294±0.010 ms 33.5 Mpx/s speedup=592.685364x
+[bench] 256x256x1 small    v2: kernel 1.402±0.001 ms e2e 1.735±0.010 ms 46.7 Mpx/s speedup=783.615193x
+[bench] CPU 256x256x1 base    : mean=4546.3 min=4546.3 std=0.0 ms
+[bench] 256x256x1 base     v0: kernel 15.389±0.006 ms e2e 15.722±0.006 ms 4.3 Mpx/s speedup=289.163173x
+[bench] 256x256x1 base     v1: kernel 6.930±0.001 ms e2e 7.262±0.009 ms 9.5 Mpx/s speedup=626.006008x
+[bench] 256x256x1 base     v2: kernel 5.022±0.002 ms e2e 5.355±0.007 ms 13.1 Mpx/s speedup=848.993473x
+[bench] CPU 256x256x1 strong-h: mean=4469.6 min=4469.6 std=0.0 ms
+[bench] 256x256x1 strong-h v0: kernel 15.392±0.003 ms e2e 15.730±0.013 ms 4.3 Mpx/s speedup=284.151399x
+[bench] 256x256x1 strong-h v1: kernel 6.931±0.002 ms e2e 7.271±0.011 ms 9.5 Mpx/s speedup=614.752687x
+[bench] 256x256x1 strong-h v2: kernel 5.021±0.002 ms e2e 5.358±0.010 ms 13.1 Mpx/s speedup=834.121213x
+[bench] CPU 256x256x1 large   : mean=13083.6 min=13083.6 std=0.0 ms
+[bench] 256x256x1 large    v0: kernel 47.481±0.004 ms e2e 47.822±0.011 ms 1.4 Mpx/s speedup=273.585993x
+[bench] 256x256x1 large    v1: kernel 21.122±0.002 ms e2e 21.459±0.009 ms 3.1 Mpx/s speedup=609.690543x
+[bench] 256x256x1 large    v2: kernel 21.122±0.008 ms e2e 21.475±0.022 ms 3.1 Mpx/s speedup=609.233199x
+[bench] CPU 256x256x3 small   : mean=1754.8 min=1754.8 std=0.0 ms
+[bench] 256x256x3 small    v0: kernel 8.947±0.006 ms e2e 9.336±0.015 ms 7.3 Mpx/s speedup=187.949839x
+[bench] 256x256x3 small    v1: kernel 4.414±0.002 ms e2e 4.800±0.010 ms 14.8 Mpx/s speedup=365.592085x
+[bench] 256x256x3 small    v2: kernel 3.628±0.002 ms e2e 4.015±0.011 ms 18.1 Mpx/s speedup=437.076972x
+[bench] CPU 256x256x3 base    : mean=5976.5 min=5976.5 std=0.0 ms
+[bench] 256x256x3 base     v0: kernel 33.416±0.008 ms e2e 33.826±0.016 ms 2.0 Mpx/s speedup=176.685902x
+[bench] 256x256x3 base     v1: kernel 24.772±0.137 ms e2e 25.170±0.139 ms 2.6 Mpx/s speedup=237.442747x
+[bench] 256x256x3 base     v2: kernel 21.087±0.015 ms e2e 21.483±0.019 ms 3.1 Mpx/s speedup=278.204376x
+[bench] CPU 256x256x3 strong-h: mean=5932.7 min=5932.7 std=0.0 ms
+[bench] 256x256x3 strong-h v0: kernel 33.418±0.007 ms e2e 33.867±0.062 ms 2.0 Mpx/s speedup=175.180468x
+[bench] 256x256x3 strong-h v1: kernel 24.835±0.022 ms e2e 25.240±0.028 ms 2.6 Mpx/s speedup=235.058062x
+[bench] 256x256x3 strong-h v2: kernel 21.089±0.017 ms e2e 21.490±0.017 ms 3.1 Mpx/s speedup=276.072327x
+[bench] CPU 256x256x3 large   : mean=17936.4 min=17936.4 std=0.0 ms
+[bench] 256x256x3 large    v0: kernel 104.300±0.012 ms e2e 104.691±0.012 ms 0.6 Mpx/s speedup=171.326439x
+[bench] 256x256x3 large    v1: kernel 110.393±0.851 ms e2e 110.789±0.848 ms 0.6 Mpx/s speedup=161.896163x
+[bench] 256x256x3 large    v2: kernel 109.894±0.822 ms e2e 110.286±0.821 ms 0.6 Mpx/s speedup=162.635792x
+[bench] 完成，CSV 已写入 experiments/results/moore_s4000_musa5.1/benchmark_256.csv

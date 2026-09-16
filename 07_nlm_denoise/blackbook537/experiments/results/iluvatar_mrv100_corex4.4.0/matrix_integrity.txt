@@ -1,0 +1,4 @@
+columns=config,size,channels,pr,sr,h,sigma,kernel_ver,warmup,repeat,kernel_mean_ms,kernel_min_ms,kernel_stddev_ms,e2e_mean_ms,e2e_min_ms,e2e_stddev_ms,mpx_s,cpu_repeat,cpu_mean_ms,cpu_min_ms,cpu_stddev_ms,speedup_e2e
+rows=48 unique_keys=48 expected=48 pass=True
+repeat_values=3
+warmup_values=1

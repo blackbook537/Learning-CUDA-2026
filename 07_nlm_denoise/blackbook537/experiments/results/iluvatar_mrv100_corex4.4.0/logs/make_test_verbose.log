@@ -1,0 +1,31 @@
+=== Selected build/iluvatar/nlm_denoise -> build/nlm_denoise ===
+=== Running tests (output from build/nlm_denoise) ===
+=== Verbose mode: Enabled (using '--verbose') ===
+build/nlm_denoise units
+========== NLM 单元测试 ==========
+[units] 参数解析
+  [PASS] 正常解析（含注释/缺省）
+  [PASS] 未知 key 拒绝
+  [PASS] 越界取值拒绝
+[units] 质量指标
+  [PASS] MAE(相同图像)=0
+  [PASS] PSNR(相同图像)=inf
+  [PASS] MAE(恒差10)=10
+  [PASS] PSNR(恒差10)≈28.13dB
+[units] CPU 参考实现
+  [PASS] 常量灰度图恒等
+  [PASS] 常量 RGB 图恒等
+  [PASS] 确定性（两次运行一致）
+  [PASS] 极小图（5x7, sr=10）不崩溃且尺寸正确
+    降噪前后对干净图 MAE: 12.48 -> 1.57
+  [PASS] 降噪有效性（MAE 下降）
+========== 全部通过（失败 0 项）==========
+=== Verbose extra: GPU 端到端正确性校验（256x256 RGB）===
+[gen] 已生成 256x256x3 sigma=25.0 -> /tmp/nlm_make_run.png
+[validate] 图像 256x256x3，参数 pr=3 sr=10 h=10.0 sigma=25.0
+[validate] CPU 参考耗时: 7374.1 ms
+ver    kernel(ms)   e2e(ms)      MAE(vsCPU)   PSNR(dB)   判定
+0      40.574       58.245       0.0000       inf        PASS
+1      29.442       29.758       0.0000       inf        PASS
+2      26.244       26.613       0.0000       inf        PASS
+[validate] 总体判定: PASS

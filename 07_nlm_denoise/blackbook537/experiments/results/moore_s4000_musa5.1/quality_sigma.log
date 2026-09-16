@@ -1,0 +1,15 @@
+[gen] 已生成 1920x1080x3 sigma=10.0 -> experiments/results/moore_s4000_musa5.1/quality_images/noisy_1920x1080_3ch_sigma10_seed7.png
+[metrics] noisy-sigma10  1920x1080x3  MAE=4.997221  PSNR=32.883942 dB
+[run] 1920x1080x3  kernel v2  pr=3 sr=10 h=10.0 sigma=10.0
+[run] kernel=467.977 ms  e2e=550.810 ms (H2D 1.594 / D2H 4.382)  4.43 Mpx/s
+[metrics] denoised-sigma10  1920x1080x3  MAE=0.304271  PSNR=53.265898 dB
+[gen] 已生成 1920x1080x3 sigma=25.0 -> experiments/results/moore_s4000_musa5.1/quality_images/noisy_1920x1080_3ch_sigma25_seed7.png
+[metrics] noisy-sigma25  1920x1080x3  MAE=12.485684  PSNR=24.947823 dB
+[run] 1920x1080x3  kernel v2  pr=3 sr=10 h=10.0 sigma=25.0
+[run] kernel=467.966 ms  e2e=525.022 ms (H2D 1.460 / D2H 3.655)  4.43 Mpx/s
+[metrics] denoised-sigma25  1920x1080x3  MAE=0.597227  PSNR=49.414889 dB
+[gen] 已生成 1920x1080x3 sigma=50.0 -> experiments/results/moore_s4000_musa5.1/quality_images/noisy_1920x1080_3ch_sigma50_seed7.png
+[metrics] noisy-sigma50  1920x1080x3  MAE=24.883010  PSNR=18.960290 dB
+[run] 1920x1080x3  kernel v2  pr=3 sr=10 h=10.0 sigma=50.0
+[run] kernel=467.910 ms  e2e=524.554 ms (H2D 1.361 / D2H 3.947)  4.43 Mpx/s
+[metrics] denoised-sigma50  1920x1080x3  MAE=1.190769  PSNR=43.964257 dB

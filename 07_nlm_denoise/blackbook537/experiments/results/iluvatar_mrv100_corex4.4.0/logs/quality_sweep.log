@@ -1,0 +1,30 @@
+=== Selected build/iluvatar/nlm_denoise -> build/nlm_denoise ===
+[gen] 已生成 1920x1080x3 sigma=0.0 -> experiments/results/current/iluvatar_mrv100_corex4.4.0/quality_images/clean_1920x1080_3ch.png
+[gen] 已生成 1920x1080x3 sigma=25.0 -> experiments/results/current/iluvatar_mrv100_corex4.4.0/quality_images/noisy_1920x1080_3ch_sigma25.png
+[metrics] noisy-sigma25  1920x1080x3  MAE=12.485684  PSNR=24.947823 dB
+[run] 1920x1080x3  kernel v2  pr=2 sr=7 h=10.0 sigma=25.0
+[run] kernel=144.998 ms  e2e=172.086 ms (H2D 3.647 / D2H 8.814)  14.30 Mpx/s
+[metrics] small  1920x1080x3  MAE=0.803424  PSNR=47.358490 dB
+[run] 1920x1080x3  kernel v2  pr=3 sr=10 h=10.0 sigma=25.0
+[run] kernel=715.486 ms  e2e=743.133 ms (H2D 3.635 / D2H 8.706)  2.90 Mpx/s
+[metrics] base  1920x1080x3  MAE=0.597227  PSNR=49.414889 dB
+[run] 1920x1080x3  kernel v2  pr=4 sr=14 h=10.0 sigma=25.0
+[run] kernel=3757.316 ms  e2e=3791.115 ms (H2D 9.054 / D2H 8.778)  0.55 Mpx/s
+[metrics] large  1920x1080x3  MAE=0.463451  PSNR=50.948416 dB
+[gen] 已生成 1920x1080x3 sigma=10.0 -> experiments/results/current/iluvatar_mrv100_corex4.4.0/quality_images/noisy_1920x1080_3ch_sigma10.png
+[metrics] noisy-sigma10  1920x1080x3  MAE=4.997221  PSNR=32.883942 dB
+[run] 1920x1080x3  kernel v2  pr=3 sr=10 h=10.0 sigma=10.0
+[run] kernel=712.553 ms  e2e=741.475 ms (H2D 3.783 / D2H 8.811)  2.91 Mpx/s
+[metrics] denoised-sigma10  1920x1080x3  MAE=0.304271  PSNR=53.265898 dB
+[gen] 已生成 1920x1080x3 sigma=25.0 -> experiments/results/current/iluvatar_mrv100_corex4.4.0/quality_images/noisy_1920x1080_3ch_sigma25.png
+[metrics] noisy-sigma25  1920x1080x3  MAE=12.485684  PSNR=24.947823 dB
+[run] 1920x1080x3  kernel v2  pr=3 sr=10 h=10.0 sigma=25.0
+[run] kernel=712.328 ms  e2e=740.256 ms (H2D 3.793 / D2H 8.833)  2.91 Mpx/s
+[metrics] denoised-sigma25  1920x1080x3  MAE=0.597227  PSNR=49.414889 dB
+[gen] 已生成 1920x1080x3 sigma=50.0 -> experiments/results/current/iluvatar_mrv100_corex4.4.0/quality_images/noisy_1920x1080_3ch_sigma50.png
+[metrics] noisy-sigma50  1920x1080x3  MAE=24.883010  PSNR=18.960290 dB
+[run] 1920x1080x3  kernel v2  pr=3 sr=10 h=10.0 sigma=50.0
+[run] kernel=715.345 ms  e2e=743.471 ms (H2D 3.965 / D2H 8.857)  2.90 Mpx/s
+[metrics] denoised-sigma50  1920x1080x3  MAE=1.190769  PSNR=43.964257 dB
+Quality results: experiments/results/current/iluvatar_mrv100_corex4.4.0/quality_tradeoff.csv, experiments/results/current/iluvatar_mrv100_corex4.4.0/quality_sigma.csv
+Generated images: experiments/results/current/iluvatar_mrv100_corex4.4.0/quality_images/

@@ -65,7 +65,10 @@ inline ImageU8 MakeSyntheticImage(int w, int h, int c, float sigma, uint32_t see
 int RunValidate(const std::string& input, const std::string& output,
                 const std::string& params_path);
 int RunBenchmark(const std::string& sizes_spec, const std::string& channels_spec,
-                 const std::string& csv_path, int warmup, int repeat, bool with_cpu);
+                 const std::string& param_sets_spec, const std::string& csv_path,
+                 int warmup, int repeat, bool with_cpu, int cpu_repeat);
+int RunMetrics(const std::string& reference_path, const std::string& test_path,
+               const std::string& label, const std::string& csv_path);
 int RunUnitTests();
 
 #endif // NLM_TESTER_UTILS_H

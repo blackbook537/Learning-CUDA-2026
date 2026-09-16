@@ -1,0 +1,8 @@
+[bench] param_sets=base warmup=1 repeat=3 cpu_repeat=1 -> experiments/results/current/metax_c500/benchmark_base_gray.csv
+[bench] 1920x1080x1 base     v0: kernel 428.420±0.012 ms e2e 429.623±0.583 ms 4.8 Mpx/s
+[bench] 1920x1080x1 base     v1: kernel 159.980±0.002 ms e2e 161.237±0.325 ms 13.0 Mpx/s
+[bench] 1920x1080x1 base     v2: kernel 1365.515±0.643 ms e2e 1367.178±0.643 ms 1.5 Mpx/s
+[bench] 3840x2160x1 base     v0: kernel 1677.982±0.024 ms e2e 1682.485±1.183 ms 4.9 Mpx/s
+[bench] 3840x2160x1 base     v1: kernel 624.215±0.002 ms e2e 626.646±0.028 ms 13.3 Mpx/s
+[bench] 3840x2160x1 base     v2: kernel 5422.635±0.963 ms e2e 5427.651±2.104 ms 1.5 Mpx/s
+[bench] 完成，CSV 已写入 experiments/results/current/metax_c500/benchmark_base_gray.csv

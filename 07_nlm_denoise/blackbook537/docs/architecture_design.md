@@ -90,10 +90,9 @@ nlm_denoise_project/
 ├── Makefile                      # 多平台构建（目标语义对齐 Learning-CUDA 仓库）
 ├── LICENSE                       # MIT（与目标仓库一致）
 ├── README.md
-├── nvidia_result.txt             # NVIDIA 平台实测结果（真实运行输出）
-├── metaX_result.txt              # 沐曦结果（待实测占位）
-├── moore_result.txt              # 摩尔结果（待实测占位）
-├── bench.csv                     # 48 组实测性能数据
+├── experiments/                  # 参数定义、分设备原始结果、临时工作区
+│   ├── configs/
+│   └── results/{rtx4090d,rtx3060_laptop,moore_s4000_musa5.1,metax_c500_maca3.0,unverified}/
 ├── docs/
 │   ├── architecture_design.md    # 本文档
 │   ├── user_guide.md             # 讲解与使用文档
@@ -156,11 +155,11 @@ nlm_denoise_project/
 | 领域 | 选型 | 备选 | 选型理由 |
 |---|---|---|---|
 | 主语言 | CUDA C++17（NVIDIA，nvcc） | — | 任务默认平台；与 Learning-CUDA 环境一致（CUDA Toolkit ≥ 11.0） |
-| 国产平台编译 | clang++（Iluvatar CoreX，`-x ivcore`）、mxcc（MetaX MACA）、mcc（Moore MUSA，C++11 子集） | — | 与训练营算力文档及 Makefile 的 `PLATFORM` 切换机制完全一致 |
+| 国产平台编译 | clang++（Iluvatar CoreX，`-x ivcore`）、mxcc（MetaX MACA）、mcc（Moore MUSA，C++11 子集） | — | 与训练营 `PLATFORM` 约定一致；MR-V100 / CoreX 4.4、C500 / MACA 3.0 与 S4000 / MUSA 5.1 均已实测 |
 | 图像编解码 | stb_image / stb_image_write（单头文件） | OpenCV `cv::imread/imwrite` | 零依赖、易交叉编译到国产平台；OpenCV 仅在 validate/bench 主机工具中使用 |
 | 参考实现 | 自研 CPU NLM + OpenCV `fastNlMeansDenoising(Colored)` 双基线 | — | 任务要求允许二者其一；双基线可交叉验证 OpenCV 自身近似带来的偏差 |
 | 构建系统 | GNU Make（沿用 `PLATFORM=` 切换约定） | CMake | 与训练营提交要求及既有仓库一致，降低评审环境风险 |
-| 性能分析 | Nsight Compute (ncu) + Nsight Systems (nsys) | nvprof（已弃用） | 任务加分项要求 |
+| 性能分析 | NVIDIA ncu/nsys；MetaX mcTracer；程序内 CUDA Event | nvprof（已弃用） | 按平台保留可用证据；C500 已生成 mcTracer JSON，MR-V100/S4000 镜像无 profiler CLI 时保留 kernel/H2D/D2H/e2e 统计并明确限制 |
 | 版本控制 | Git，提交至 Learning-CUDA `2026-summer-project` 分支 | — | 任务提交要求 |
 | 精度 | 计算全程 FP32；存储/IO 为 UINT8 | FP16 加速（见 §8 权衡） | FP32 保证与 CPU/OpenCV 参考的 PSNR 可比性 |
 
@@ -235,7 +234,9 @@ sigma = 25.0              # 噪声标准差估计，8位图像范围 0-255
 ```bash
 nlm_denoise run      -i input.png -o output.png -p params/default.txt [--kernel 0|1|2] [--log data/logs/nlm_perf.log]
 nlm_denoise validate -i input.png -o output.png -p params/default.txt
-nlm_denoise bench    --sizes 1920x1080,3840x2160 --channels 1,3 --log bench.csv
+nlm_denoise bench    --sizes 1920x1080,3840x2160 --channels 1,3 \
+                     --param-sets all --log experiments/results/current/benchmark.csv
+nlm_denoise metrics  --reference clean.png --test output.png --label base --log quality.csv
 ```
 
 ### 6.3 核心 C/C++ API
@@ -368,12 +369,12 @@ GPU_LAUNCH(kernel, grid, block, args...)   GPU_CHECK_LAST()
 - `#pragma unroll` 展开 patch 内层循环（pr≤3 时 7×7 完全展开），寄存器压力通过 `__launch_bounds__` 约束验证。
 - 占用率调优：用 `cudaOccupancyMaxPotentialBlockSize` 选 block 形状，ncu 复核 achieved occupancy ≥ 50%。
 
-### V3 —— 进阶优化（按 4K 交互式目标选做，预期再 1.5–4×）
+### 未来 V3 —— 尚未实现的研究路线（不属于当前 CLI）
 
 按投入产出排序，逐项接入并独立验证：
 
 1. **向量化与多像素/thread**：1 thread 计算 1×2/2×1 相邻像素，共享搜索窗内大部分 patch 数据，寄存器内复用；`float4` 加载 smem 行。
-2. **积分图/盒式滤波近似（可选近似路径）**：patch L2 距离可用积分图 O(1) 求得（误差来源：clamp 边界与浮点累加），计算量从 O(sr²·pr²) 降为 O(sr²)；作为 `--kernel v3 --approx` 可选路径，报告中对比 MAE/PSNR 退化。
+2. **积分图/盒式滤波近似（候选路线）**：patch L2 距离可用积分图 O(1) 求得（误差来源：clamp 边界与浮点累加），计算量从 O(sr²·pr²) 降为 O(sr²)。如未来实现，必须增加独立 CLI 入口并报告 MAE/PSNR 退化；当前版本没有 `--kernel 3`。
 3. **Warp 级协作**：搜索窗按 warp 内 lane 切分，warp shuffle 归约权重和，减少 smem 往返。
 4. **查表近似 exp**：权重函数关于 dist 单调，可对 dist 量化后查表（shared memory LUT），权衡精度报告。
 5. **4K 专用调度**：大分辨率下显存带宽充裕、计算为主，采用 stream 分片处理 ROI， overlap H2D/D2H（为交互式场景铺路）。
@@ -385,12 +386,16 @@ GPU_LAUNCH(kernel, grid, block, args...)   GPU_CHECK_LAST()
 | V0 | 直接移植 | 20–60× | 与 CPU ref MAE < 0.5 |
 | V1 | smem halo 缓存 | 100–400× | vs V0 MAE < 0.5 |
 | V2 | unroll/常量/快速数学/占用率 | 200–800× | vs V0 MAE < 1.0（含 __expf 误差说明） |
-| V3 | 多像素复用/积分图近似/LUT | 400× 以上，1080p 趋近 <30 ms，4K <150 ms | 近似路径单独报 MAE/PSNR 与误差分析 |
+| 未来 V3（未实现） | 多像素复用/积分图近似/LUT | 仅为目标，不是实测结论 | 实现后须单独报告 MAE/PSNR 与误差分析 |
 
-### ncu / nsys 分析计划（加分项）
+### ncu / nsys / mcTracer 分析计划（加分项）
 
 - **ncu**：对 V0→V2 各采 `SpeedOfLight`、`MemoryWorkloadAnalysis`、`Occupancy` 三组指标，给出 compute/memory throughput 占比、L2 命中率、smem bank conflict 计数、achieved occupancy，形成"瓶颈—优化—指标变化"闭环表格写入报告。
 - **nsys**：对 `bench` 全链路采时间线，确认 kernel 占端到端时间比 > 90%，H2D/D2H 无异常气泡；4K 分片版本验证 stream overlap 效果。
+- **mcTracer**：MetaX 上采集 Chrome trace JSON，分解 H2D、u8↔f32、NLM 与 D2H；
+  C500 1080p RGB/base/V1 实测 NLM 占求和设备事件 99.617%。
+- **CoreX/MUSA 镜像限制**：本次 MR-V100 与 S4000 镜像都未提供原生 profiler CLI；
+  不跨平台移植 trace 结论，改为保留工具探测日志和程序内 CUDA Event 分项计时。
 
 ---
 
@@ -441,7 +446,7 @@ M1  工程骨架：Makefile 多平台框架、params/image_io/CLI 打通、stb �
 M2  正确性基线：nlm_cpu_ref + V0 naive kernel + validate 工具，1080p 跑通 MAE/PSNR
 M3  核心优化：V1 smem + V2 指令级优化，benchmark 矩阵跑通，ncu 第一轮分析
 M4  进阶冲刺：V3 选做项 + 4K 调优，nsys 全链路分析，性能日志定型
-M5  平台扩展：按优先级 MetaX → Moore → Iluvatar 适配验证（Makefile PLATFORM 分支）
+M5  平台扩展：Iluvatar MR-V100、MetaX C500 与 Moore S4000 三条国产路径均已实测
 M6  交付整理：报告（思路/优化历程/质量与性能指标/ncu-nsys 分析/未来工作）、
     代码清理、提交至 Learning-CUDA 2026-summer-project 分支
 ```
@@ -452,23 +457,26 @@ M6  交付整理：报告（思路/优化历程/质量与性能指标/ncu-nsys �
 # NVIDIA（默认）；目标语义同参考仓库：make = build + run tests
 make                            # 构建并运行单元测试
 make run VERBOSE=true           # 附加 GPU 端到端正确性校验
-./build/nlm_denoise run -i data/noisy/noisy.png -o data/output/denoised.png -p params/default.txt
+./build/nlm_denoise run -i data/noisy/noisy_1920x1080_3ch_sigma25.png \
+  -o data/output/denoised.png -p params/default.txt
 
 # 国产平台（与 Learning-CUDA 约定一致）
 make build PLATFORM=metax       # mxcc，编译 kernels/metax/kernels.maca
-make build PLATFORM=moore       # mcc -std=c++11，编译 kernels/moore/kernels.mu
-make build PLATFORM=iluvatar    # clang++ -x ivcore
+make build PLATFORM=moore       # 默认 MUSA_HOME=/usr/local/musa
+make build PLATFORM=iluvatar    # COREX_HOME=/usr/local/corex，clang++ -x ivcore
 
 # 验证与基准
 ./build/nlm_denoise validate ... && ./build/nlm_denoise bench ...
 ```
 
-部署形态：单可执行文件 + 参数文件 + 测试图像，无外部运行时依赖（stb 全静态编译；OpenCV 仅 validate/bench 需要，可条件编译 `-DWITH_OPENCV` 剥离）。
+部署形态：单可执行文件 + 参数文件 + 测试图像。stb 全静态编入，图像 I/O 无额外依赖；
+运行时仍需目标 GPU 驱动与 CUDA/CoreX/MACA/MUSA runtime。OpenCV 仅在启用交叉验证时需要。
 
 ### 11.3 环境要求
 
 - NVIDIA：CUDA Toolkit ≥ 11.0，GPU 计算能力 ≥ 7.0（V100/T4 及以上优先；Ampere/Hopper 直接可用）；
-- 天数：BI-150 CoreX 环境；沐曦：标准 MACA 环境；摩尔：MUSA 环境（C++11）；
+- 天数：CoreX 4.4（MR-V100 32 GB 已实测）；沐曦：MACA 3.0（C500 25% sGPU 已实测）；
+  摩尔：MUSA 5.1（MTT S4000 已实测，C++11）；
 - 主机：Linux x86_64，GNU Make，C++17 编译器。
 
 ---
@@ -481,7 +489,7 @@ make build PLATFORM=iluvatar    # clang++ -x ivcore
 | `__expf`/LUT 近似降低 PSNR | 验证不达标 | 近似全部做成独立开关，默认精确路径；报告中量化误差来源 |
 | OpenCV 参考与任务公式语义差异（OpenCV 使用预计算模板与不同归一化） | MAE 虚高 | 以自研 CPU 参考为主基线；报告中说明两者公式差异，仅将 OpenCV 作为交叉验证 |
 | RGB 联合 patch 距离 vs 逐通道独立 NLM 的语义选择 | 与参考对比口径 | 默认实现"三通道 patch 距离求和、共享权重"（与 OpenCV colored 一致），并在报告中声明 |
-| 摩尔线程 C++11 限制 | 编译失败 | 核心代码只用 C++11 子集；CI 中 `PLATFORM=moore` 做编译检查 |
+| 摩尔线程 C++11 限制 | 编译失败 | 核心代码只用 C++11 子集；MTT S4000 上 `PLATFORM=moore` 干净构建与完整矩阵均已通过 |
 | 寄存器压力导致 occupancy 塌陷（V2/V3） | 性能反降 | `__launch_bounds__` + ncu 复核，每项优化以实测数据决定去留 |
 
 ---

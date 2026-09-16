@@ -1,0 +1,5 @@
+# 任务基线
+patch_radius = 3
+search_radius = 10
+h = 10
+sigma = 25

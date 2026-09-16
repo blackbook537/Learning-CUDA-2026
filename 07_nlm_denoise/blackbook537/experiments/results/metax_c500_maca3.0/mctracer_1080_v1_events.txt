@@ -1,0 +1,7 @@
+trace=experiments/results/current/metax_c500/mctracer/nlm_1080_v1-3213.json
+device_event_total_ms=423.851008
+memcpy HTOD(pinned,device)	0.006656 ms	0.002%
+nlm::CvtU8ToF32PlanarKernel(unsigned char const*, float*, int, int, int)	0.235520 ms	0.056%
+nlm::NlmSmemKernel(float const*, float*, int, int, int, NlmParamsDev)	422.226432 ms	99.617%
+nlm::CvtF32ToU8InterleavedKernel(float const*, unsigned char*, int, int, int)	0.549376 ms	0.130%
+memcpy DTOH(device,pageable)	0.833024 ms	0.197%

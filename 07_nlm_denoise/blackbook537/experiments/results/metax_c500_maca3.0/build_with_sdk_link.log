@@ -1,0 +1,3 @@
+=== Linking executable (build/metax/nlm_denoise, metax) ===
+mxcc -std=c++17 -O3 -I/opt/maca/tools/cu-bridge/include -DPLATFORM_METAX -o build/metax/nlm_denoise build/obj/metax/src/main.o build/obj/metax/src/params.o build/obj/metax/src/image_io.o build/obj/metax/src/pipeline.o build/obj/metax/src/nlm_cpu_ref.o build/obj/metax/tester/validate.o build/obj/metax/tester/benchmark.o build/obj/metax/tester/metrics.o build/obj/metax/tester/test_units.o build/obj/metax/kernels/kernels.o -L/opt/maca/lib -Wl,-rpath,/opt/maca/lib -lruntime_cu -lsymbol_cu
+=== Selected build/metax/nlm_denoise -> build/nlm_denoise ===

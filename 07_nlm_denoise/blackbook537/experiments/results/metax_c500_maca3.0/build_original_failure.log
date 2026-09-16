@@ -1,0 +1,19 @@
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c src/main.cpp -o build/obj/metax/src/main.o
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c src/params.cpp -o build/obj/metax/src/params.o
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c src/image_io.cpp -o build/obj/metax/src/image_io.o
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c src/pipeline.cpp -o build/obj/metax/src/pipeline.o
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c src/nlm_cpu_ref.cpp -o build/obj/metax/src/nlm_cpu_ref.o
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c tester/validate.cpp -o build/obj/metax/tester/validate.o
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c tester/benchmark.cpp -o build/obj/metax/tester/benchmark.o
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c tester/metrics.cpp -o build/obj/metax/tester/metrics.o
+mxcc -std=c++17 -O3 -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c tester/test_units.cpp -o build/obj/metax/tester/test_units.o
+=== Compiling kernels (kernels/metax/kernels.maca) ===
+mxcc -std=c++17 -O3  -DPLATFORM_METAX -Iinclude -Ithird_party/stb -c kernels/metax/kernels.maca -o build/obj/metax/kernels/kernels.o
+In file included from kernels/metax/kernels.maca:4:
+In file included from kernels/metax/../common/kernels_impl.inl:7:
+include/pal/platform_api.h:43:10: fatal error: 'cuda_runtime.h' file not found
+#include <cuda_runtime.h>
+         ^~~~~~~~~~~~~~~~
+1 error generated when compiling for xcore1000.
+make: *** [Makefile:186: build/obj/metax/kernels/kernels.o] Error 1
+make: *** Waiting for unfinished jobs....

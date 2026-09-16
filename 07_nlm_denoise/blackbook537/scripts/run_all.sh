@@ -17,6 +17,7 @@ echo "===== [3/4] 正确性校验（1080p RGB 合成含噪图，任务基线参�
 
 echo "===== [4/4] 性能基准（1080p + 4K，灰度 + RGB）====="
 ./build/nlm_denoise bench --sizes 1920x1080,3840x2160 --channels 1,3 \
-    --warmup 3 --repeat 10 --log bench.csv
+    --param-sets small,base,strong-h,large --warmup 3 --repeat 10 \
+    --log experiments/results/current/benchmark.csv
 
-echo "===== 全部通过，性能日志: bench.csv ====="
+echo "===== 全部通过，性能日志: experiments/results/current/benchmark.csv ====="

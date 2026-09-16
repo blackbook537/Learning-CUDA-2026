@@ -4,6 +4,11 @@ build/
 # 运行期生成数据（gen / run / validate 的输出与日志，程序会自动重建父目录）
 data/output/
 data/logs/
+experiments/work/
+experiments/results/current/
+*.nsys-rep
+*.ncu-rep
+*.qdrep
 
 # 常见编辑器 / 系统杂项
 .vscode/

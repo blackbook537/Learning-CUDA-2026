@@ -1,0 +1,2 @@
+[run] 1920x1080x3  kernel v1  pr=3 sr=10 h=10.0 sigma=25.0
+[run] kernel=789.410 ms  e2e=817.445 ms (H2D 3.837 / D2H 8.866)  2.63 Mpx/s

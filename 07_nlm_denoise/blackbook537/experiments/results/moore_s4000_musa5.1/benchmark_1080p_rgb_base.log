@@ -1,0 +1,6 @@
+[bench] param_sets=base warmup=3 repeat=10 cpu_repeat=1 -> experiments/results/moore_s4000_musa5.1/benchmark_1080p_rgb_base.csv
+[bench] CPU 1920x1080x3 base    : mean=186736.5 min=186736.5 std=0.0 ms
+[bench] 1920x1080x3 base     v0: kernel 1030.027±0.045 ms e2e 1033.800±0.908 ms 2.0 Mpx/s speedup=180.631052x
+[bench] 1920x1080x3 base     v1: kernel 567.906±1.576 ms e2e 571.939±1.891 ms 3.7 Mpx/s speedup=326.497332x
+[bench] 1920x1080x3 base     v2: kernel 467.985±0.066 ms e2e 471.324±0.598 ms 4.4 Mpx/s speedup=396.195878x
+[bench] 完成，CSV 已写入 experiments/results/moore_s4000_musa5.1/benchmark_1080p_rgb_base.csv
