@@ -1,4 +1,4 @@
-#include "core/nlm_cpu_ref.h"
+#include "nlm_cpu_ref.h"
 
 #include <cmath>
 #include <vector>

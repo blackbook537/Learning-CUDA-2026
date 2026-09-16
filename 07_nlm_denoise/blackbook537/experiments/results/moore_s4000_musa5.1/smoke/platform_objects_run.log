@@ -1,2 +1,0 @@
-[run] 64x64x3  kernel v2  pr=3 sr=10 h=10.0 sigma=25.0
-[run] kernel=10.234 ms  e2e=101.734 ms (H2D 0.140 / D2H 0.337)  0.40 Mpx/s

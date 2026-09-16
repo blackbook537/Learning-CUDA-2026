@@ -1,5 +1,13 @@
-# 文本文件统一 LF，二进制（PNG 等）由 git 自动识别，不转换
 * text=auto eol=lf
-
-# 实机原始日志按采集结果原样保存；不把设备 CLI 自带的行尾空格当作源码问题。
-experiments/results/** -whitespace
+*.sh text eol=lf
+*.py text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.cu text eol=lf
+*.mu text eol=lf
+*.maca text eol=lf
+Makefile text eol=lf
+*.png binary
+*.pdf binary
+# Historical evidence hashes refer to the original bytes, including line endings.
+assets/results/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

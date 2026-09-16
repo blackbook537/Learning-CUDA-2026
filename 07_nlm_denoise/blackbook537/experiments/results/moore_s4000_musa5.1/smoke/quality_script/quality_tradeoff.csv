@@ -1,5 +1,0 @@
-label,reference,test,width,height,channels,mae,psnr_db
-noisy-sigma25,experiments/results/moore_s4000_musa5.1/smoke/quality_script/smoke/quality_script/images/clean_64x64_3ch.png,experiments/results/moore_s4000_musa5.1/smoke/quality_script/smoke/quality_script/images/noisy_64x64_3ch_sigma25.png,64,64,3,12.484375,24.944139
-small,experiments/results/moore_s4000_musa5.1/smoke/quality_script/smoke/quality_script/images/clean_64x64_3ch.png,experiments/results/moore_s4000_musa5.1/smoke/quality_script/smoke/quality_script/images/denoised_small_64x64_3ch_sigma25.png,64,64,3,1.193278,43.504898
-base,experiments/results/moore_s4000_musa5.1/smoke/quality_script/smoke/quality_script/images/clean_64x64_3ch.png,experiments/results/moore_s4000_musa5.1/smoke/quality_script/smoke/quality_script/images/denoised_base_64x64_3ch_sigma25.png,64,64,3,1.319499,42.415254
-large,experiments/results/moore_s4000_musa5.1/smoke/quality_script/smoke/quality_script/images/clean_64x64_3ch.png,experiments/results/moore_s4000_musa5.1/smoke/quality_script/smoke/quality_script/images/denoised_large_64x64_3ch_sigma25.png,64,64,3,1.353760,42.147562

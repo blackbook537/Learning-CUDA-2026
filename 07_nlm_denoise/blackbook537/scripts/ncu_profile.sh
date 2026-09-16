@@ -5,8 +5,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-mkdir -p experiments/work experiments/results/current
-IMG=experiments/work/nlm_ncu.png
+mkdir -p output/work output/results
+IMG=output/work/nlm_ncu.png
 ./build/nlm_denoise gen -o "${IMG}" --size 1920x1080 --channels 3 --sigma 25
 
 for V in 0 1 2; do
@@ -15,8 +15,8 @@ for V in 0 1 2; do
         --section MemoryWorkloadAnalysis \
         --section Occupancy \
         --kernel-name-base demangled \
-        -o "experiments/work/ncu_v${V}" -f \
-        ./build/nlm_denoise run -i "${IMG}" -o experiments/work/nlm_ncu_out.png \
-            -p params/default.txt --kernel "${V}" --log /dev/null
+        -o "output/work/ncu_v${V}" -f \
+        ./build/nlm_denoise run -i "${IMG}" -o output/work/nlm_ncu_out.png \
+            -p params.txt --kernel "${V}" --log /dev/null
 done
-echo "报告文件: experiments/work/ncu_v0.ncu-rep / ncu_v1.ncu-rep / ncu_v2.ncu-rep"
+echo "报告文件: output/work/ncu_v0.ncu-rep / ncu_v1.ncu-rep / ncu_v2.ncu-rep"

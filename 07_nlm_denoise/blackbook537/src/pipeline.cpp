@@ -1,6 +1,6 @@
-#include "nlm/pipeline.h"
+#include "pipeline.h"
 
-#include "kernels/kernels.h"
+#include "kernels.h"
 
 bool NlmDenoiseGpu(const ImageU8& src, ImageU8* dst,
                    const NlmParams& params, int kernel_version,

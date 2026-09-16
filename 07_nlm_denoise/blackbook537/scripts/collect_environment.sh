@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-OUT="${1:-experiments/results/current/environment.txt}"
+OUT="${1:-output/results/environment.txt}"
 PLATFORM="${PLATFORM:-nvidia}"
 COREX_HOME="${COREX_HOME:-/usr/local/corex}"
 MUSA_HOME="${MUSA_HOME:-/usr/local/musa}"
@@ -124,7 +124,7 @@ mkdir -p "$(dirname "${OUT}")"
     echo "[build-contract]"
     echo "PLATFORM=${PLATFORM}"
     if [[ "${PLATFORM}" == "nvidia" ]]; then
-        echo "ARCH=${ARCH:-sm_89}"
+        echo "ARCH=${ARCH:-compiler-default}"
     elif [[ "${PLATFORM}" == "iluvatar" ]]; then
         echo "COREX_HOME=${COREX_HOME}"
         echo "COREX_CXX=${COREX_CXX:-${COREX_HOME}/bin/clang++}"

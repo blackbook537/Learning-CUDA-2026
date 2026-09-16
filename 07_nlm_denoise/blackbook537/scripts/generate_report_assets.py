@@ -105,8 +105,10 @@ def performance_chart(csv_paths: list[Path], output: Path, device_label: str) ->
         print(f"SKIP performance chart: expected 6 base RGB rows in {csv_paths}")
         return False
 
+    legacy = any("kernel_mean_ms" not in row for row in chosen.values())
+    statistic = "kernel min / pipeline e2e mean (legacy)" if legacy else "kernel mean / pipeline e2e mean"
     image, draw = canvas(f"{device_label}: V0 / V1 / V2 latency",
-                         "Verified run; bars show kernel and GPU e2e mean")
+                         f"Archived experiment: {statistic}; excludes image I/O")
     box = (150, 190, 1510, 760)
     vals = [value(row, "kernel_mean_ms", "kernel_ms") for row in chosen.values()]
     vals += [value(row, "e2e_mean_ms", "e2e_ms") for row in chosen.values()]
@@ -152,9 +154,9 @@ def triptych(clean_path: Path, noisy_path: Path, denoised_path: Path, output: Pa
         return False
     image = Image.new("RGB", (1800, 1050), BG)
     draw = ImageDraw.Draw(image)
-    draw.text((65, 35), "NLM visual quality: full frame and 4x ROI", fill=INK,
+    draw.text((65, 35), "NLM visual quality: full frame and enlarged ROI", fill=INK,
               font=font(40, True))
-    names = ["Clean reference", "Noisy input (sigma=25)", "Denoised V2 (base)"]
+    names = ["Clean reference", "Uniform noise (amplitude=25)", "Denoised V2 (base)"]
     full_size = (540, 304)
     source_w, source_h = images[0].size
     roi_w, roi_h = 240, 136
@@ -175,7 +177,7 @@ def triptych(clean_path: Path, noisy_path: Path, denoised_path: Path, output: Pa
         crop = crop.resize((540, 306), Image.Resampling.NEAREST)
         image.paste(crop, (x, 520))
         draw.rectangle((x, 520, x + 540, 826), outline=RED, width=3)
-        draw.text((x, 840), "Center ROI, 4x nearest-neighbor zoom", fill=MUTED,
+        draw.text((x, 840), "Center ROI, 2.25x nearest-neighbor zoom", fill=MUTED,
                   font=font(19))
     draw.text((65, 980), "Paired deterministic synthetic images, seed=7; no post-processing.",
               fill=MUTED, font=font(21))
@@ -205,7 +207,7 @@ def scatter_chart(quality_csv: Path, benchmark_csvs: list[Path], output: Path,
         return False
 
     image, draw = canvas(f"Quality / latency trade-off ({device_label})",
-                         "Same sigma=25 paired input; V2; higher PSNR and lower latency are better")
+                         "Same uniform-noise amplitude=25 input; V2; higher PSNR and lower latency are better")
     box = (170, 190, 1510, 770)
     xs = list(latency.values())
     ys = list(quality.values())
@@ -335,55 +337,22 @@ def nsys_chart(csv_path: Path, output: Path) -> bool:
     return True
 
 
-def validation_card(csv_path: Path, output: Path) -> bool:
-    if not csv_path.exists():
-        return False
-    rows = read_csv(csv_path)
-    image, draw = canvas("RTX 4090 D acceptance summary",
-                         "1080p RGB, pr=3, sr=10, h=10, sigma=25")
-    draw.rounded_rectangle((80, 175, 1520, 760), radius=18, fill="white", outline=GRID,
-                           width=2)
-    headers = ["Implementation", "Kernel ms", "GPU e2e ms", "MAE vs CPU", "Status"]
-    xs = [150, 500, 760, 1040, 1340]
-    for x, header in zip(xs, headers):
-        draw.text((x, 225), header, fill=MUTED, font=font(21, True))
-    for idx, row in enumerate(rows):
-        y = 330 + idx * 115
-        values = [row["implementation"], row["kernel_ms"], row["e2e_ms"],
-                  row["mae_vs_cpu"], row["status"]]
-        for x, item in zip(xs, values):
-            draw.text((x, y), item, fill=TEAL if item == "PASS" else INK,
-                      font=font(25, item in ("V2", "PASS")))
-        draw.line((120, y + 55, 1470, y + 55), fill=GRID, width=1)
-    cpu_ms = float(rows[0]["cpu_ms"])
-    v2_e2e = float(rows[-1]["e2e_ms"])
-    draw.text((150, 700), f"CPU reference: {cpu_ms/1000:.3f} s", fill=INK,
-              font=font(24, True))
-    draw.text((650, 700), f"V2 speedup: {cpu_ms/v2_e2e:.0f}x", fill=BLUE,
-              font=font(24, True))
-    draw.text((1050, 700), "Unit tests: 12/12 PASS", fill=TEAL,
-              font=font(24, True))
-    output.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output, optimize=True)
-    return True
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--assets", type=Path, default=Path("docs/assets"))
+    parser.add_argument("--assets", type=Path, default=Path("assets"))
     parser.add_argument("--benchmark", type=Path, action="append", default=[])
     parser.add_argument("--performance-device", default="RTX 4090 D")
     parser.add_argument("--performance-output", default="performance_4090.png")
     parser.add_argument("--performance-only", action="store_true")
     parser.add_argument("--quality", type=Path,
-                        default=Path("experiments/results/current/quality_tradeoff.csv"))
+                        default=Path("assets/results/rtx3060_laptop/quality_tradeoff.csv"))
     parser.add_argument("--quality-benchmark", type=Path, action="append", default=[])
-    parser.add_argument("--quality-device", default="current run")
-    parser.add_argument("--clean", type=Path, default=Path("experiments/work/clean_1920x1080_3ch.png"))
+    parser.add_argument("--quality-device", default="RTX 3060 Laptop (archived)")
+    parser.add_argument("--clean", type=Path, default=Path("test_images/clean_1920x1080_3ch.png"))
     parser.add_argument("--noisy", type=Path,
-                        default=Path("experiments/work/noisy_1920x1080_3ch_sigma25.png"))
+                        default=Path("test_images/noisy_1920x1080_3ch_sigma25.png"))
     parser.add_argument("--denoised", type=Path,
-                        default=Path("experiments/work/denoised_base_1920x1080_3ch_sigma25.png"))
+                        default=Path("test_images/denoised_1920x1080_base_v2.png"))
     parser.add_argument("--triptych-output", default="quality_triptych.png")
     parser.add_argument("--quality-output", default="quality_latency_tradeoff.png")
     parser.add_argument("--trace", type=Path)
@@ -392,7 +361,7 @@ def main() -> int:
     args = parser.parse_args()
 
     benchmark_paths = args.benchmark or [
-        Path("experiments/results/rtx4090d/benchmark_legacy.csv")
+        Path("assets/results/rtx4090d/benchmark_legacy.csv")
     ]
     performance_generated = performance_chart(
         benchmark_paths, args.assets / args.performance_output,
@@ -405,7 +374,7 @@ def main() -> int:
     generated += triptych(args.clean, args.noisy, args.denoised,
                           args.assets / args.triptych_output)
     quality_benchmarks = args.quality_benchmark or [
-        Path("experiments/results/current/benchmark.csv")
+        Path("assets/results/rtx3060_laptop/benchmark_quality.csv")
     ]
     generated += scatter_chart(args.quality, quality_benchmarks,
                                args.assets / args.quality_output,
@@ -417,12 +386,11 @@ def main() -> int:
         expected = 4 if args.trace else 3
         print(f"Generated {generated}/{expected} assets in {args.assets}")
         return 0 if generated == expected else 1
-    generated += nsys_chart(Path("experiments/results/rtx4090d/nsys_summary_legacy.csv"),
+    generated += nsys_chart(Path("assets/results/rtx4090d/nsys_summary_legacy.csv"),
                             args.assets / "nsys_kernel_summary.png")
-    generated += validation_card(Path("experiments/results/rtx4090d/validation_legacy.csv"),
-                                 args.assets / "validation_summary.png")
-    print(f"Generated {generated}/5 assets in {args.assets}")
-    return 0 if generated == 5 else 1
+    expected = 5 if args.trace else 4
+    print(f"Generated {generated}/{expected} assets in {args.assets}")
+    return 0 if generated == expected else 1
 
 
 if __name__ == "__main__":

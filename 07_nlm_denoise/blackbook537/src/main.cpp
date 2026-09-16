@@ -2,8 +2,8 @@
 // nlm_denoise —— 实时图像非局部均值降噪（CUDA）CLI 入口
 //
 // 子命令：
-//   run      -i input.png -o output.png -p params/default.txt [--kernel v] [--log f]
-//   validate -i input.png [-o output.png] -p params/default.txt
+//   run      -i input.png -o output.png -p params.txt [--kernel v] [--log f]
+//   validate -i input.png [-o output.png] -p params.txt
 //   bench    [--sizes 1920x1080,3840x2160] [--channels 1,3]
 //            [--param-sets all|small,base,strong-h,large] [--log results.csv]
 //            [--warmup 3] [--repeat 10] [--with-cpu] [--cpu-repeat 1]
@@ -17,11 +17,11 @@
 #include <map>
 #include <string>
 
-#include "core/image_io.h"
-#include "core/nlm_cpu_ref.h"
-#include "nlm/params.h"
-#include "nlm/pipeline.h"
-#include "tester/utils.h"
+#include "image_io.h"
+#include "nlm_cpu_ref.h"
+#include "params.h"
+#include "pipeline.h"
+#include "benchmark.h"
 
 namespace {
 
@@ -39,10 +39,10 @@ void PrintUsage() {
         "\n"
         "run 选项:\n"
         "  -i <file>     输入图像（PNG/JPG，灰度或 RGB）\n"
-        "  -o <file>     输出图像（建议 data/output/，目录不存在时自动创建）\n"
-        "  -p <file>     参数文件（默认 params/default.txt）\n"
+        "  -o <file>     输出图像（建议 output/images/，目录不存在时自动创建）\n"
+        "  -p <file>     参数文件（默认 params.txt）\n"
         "  --kernel <v>  kernel 版本 0=naive 1=smem 2=smem+unroll（默认 2）\n"
-        "  --log <file>  性能日志文件（默认 data/logs/nlm_perf.log，追加写）\n"
+        "  --log <file>  性能日志文件（默认 output/logs/nlm_perf.log，追加写）\n"
         "  --with-cpu    同时运行 CPU 参考以计算加速比\n"
         "\n"
         "bench 选项:\n"
@@ -59,7 +59,7 @@ void PrintUsage() {
         "  --log <file>        可选 CSV 输出\n"
         "\n"
         "gen 选项:\n"
-        "  -o <file>     输出图像（缺省按规范自动命名：data/noisy/noisy_<尺寸>_<c>ch_sigma<σ>.png）\n");
+        "  -o <file>     输出图像（缺省按规范自动命名：output/generated/noisy_<尺寸>_<c>ch_sigma<σ>.png）\n");
 }
 
 // 解析 "-i xx / --key value / --flag" 到 map（flag 型参数值为 "1"）
@@ -87,8 +87,8 @@ std::string GetArg(const std::map<std::string, std::string>& m,
 int CmdRun(const std::map<std::string, std::string>& args) {
     const std::string input = GetArg(args, "-i", "");
     const std::string output = GetArg(args, "-o", "");
-    const std::string params_path = GetArg(args, "-p", "params/default.txt");
-    const std::string log_path = GetArg(args, "--log", "data/logs/nlm_perf.log");
+    const std::string params_path = GetArg(args, "-p", "params.txt");
+    const std::string log_path = GetArg(args, "--log", "output/logs/nlm_perf.log");
     const int kernel_ver = std::atoi(GetArg(args, "--kernel", "2").c_str());
     const bool with_cpu = args.count("--with-cpu") > 0;
 
@@ -165,10 +165,10 @@ int CmdGen(const std::map<std::string, std::string>& args) {
         std::fprintf(stderr, "[gen] 非法 --size/--channels\n");
         return 2;
     }
-    // 缺省输出：按命名规范自动生成 data/noisy/noisy_<尺寸>_<c>ch_sigma<σ>.png
+    // 缺省输出：按命名规范自动生成 output/generated/noisy_<尺寸>_<c>ch_sigma<σ>.png
     char auto_name[256];
     std::snprintf(auto_name, sizeof(auto_name),
-                  "data/noisy/noisy_%dx%d_%dch_sigma%d.png", w, h, channels,
+                  "output/generated/noisy_%dx%d_%dch_sigma%d.png", w, h, channels,
                   (int)(sigma + 0.5f));
     const std::string output = GetArg(args, "-o", auto_name);
     ImageU8 img = MakeSyntheticImage(w, h, channels, sigma, seed);
@@ -200,12 +200,12 @@ int main(int argc, char** argv) {
             return 2;
         }
         return RunValidate(input, GetArg(args, "-o", ""),
-                           GetArg(args, "-p", "params/default.txt"));
+                           GetArg(args, "-p", "params.txt"));
     } else if (cmd == "bench") {
         return RunBenchmark(GetArg(args, "--sizes", "1920x1080"),
                             GetArg(args, "--channels", "1,3"),
                             GetArg(args, "--param-sets", "all"),
-                            GetArg(args, "--log", "experiments/results/current/benchmark.csv"),
+                            GetArg(args, "--log", "output/results/benchmark.csv"),
                             std::atoi(GetArg(args, "--warmup", "3").c_str()),
                             std::atoi(GetArg(args, "--repeat", "10").c_str()),
                             args.count("--with-cpu") > 0,

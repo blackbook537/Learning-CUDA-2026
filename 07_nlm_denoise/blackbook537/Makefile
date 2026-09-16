@@ -1,34 +1,8 @@
-# *********************************************************************
-# nlm_denoise Makefile —— 实时图像非局部均值降噪（CUDA）
-# 目标语义与 Learning-CUDA 仓库约定一致：
-#   make                 : Build + run tests（默认，非 verbose）
-#   make build           : Only compile (no run)
-#   make run             : Run tests (after build, non-verbose)
-#   make run VERBOSE=true: Run tests with verbose output（附加 GPU 端到端校验）
-#   make test            : 同 run（兼容别名）
-#   make clean           : Delete temporary files
-# 变量：
-#   PLATFORM=nvidia|iluvatar|metax|moore   目标平台（默认 nvidia）
-#   WITH_OPENCV=1                          validate 增加 OpenCV 交叉验证
-#   FAST_EXP=1                             NLM 权重使用 __expf 快速指数（近似，报告需注明）
-#   NVCC/CXX_HOST/CUDA_RT/ARCH             NVIDIA 本地环境覆盖（见 README 安装步骤）
-#   COREX_HOME/COREX_CXX                   天数 CoreX SDK 与 clang++ 路径
-#   MACA_HOME/MACA_CUDA/MXCC                沐曦 MACA SDK、CUDA 兼容层与编译器路径
-#   MUSA_HOME/MCC                           Moore Threads MUSA SDK 与编译器路径
-#
-# 目录约定（详见 README 目录结构章节）：
-#   include/   全部头文件（nlm=对外接口 kernels=算子接口 pal=平台抽象
-#              core=公共支撑 tester=测试支撑）
-#   src/       Host 侧实现（.cpp）
-#   kernels/   设备侧算子（common=共享实现，{nvidia,iluvatar,metax,moore}/=
-#              各平台架构编译单元）
-#   tester/    测试与基准实现
-#   build/     全部构建产物（可执行文件 + 对象文件，clean 时整体删除）
-# *********************************************************************
+# NLM denoise: make build / run / validate / test / bench / clean
+.DEFAULT_GOAL := build
+SHELL := /bin/bash
+.DELETE_ON_ERROR:
 
-# -------------------------------
-# Configuration
-# -------------------------------
 PLATFORM    ?= nvidia
 WITH_OPENCV ?= 0
 FAST_EXP    ?= 0
@@ -108,91 +82,69 @@ ifeq ($(WITH_OPENCV),1)
     EXTRA_LIBS += $(shell pkg-config --libs opencv4)
 endif
 
-# -------------------------------
-# Sources & Objects
-# -------------------------------
+
 TARGET          := build/nlm_denoise
 PLATFORM_TARGET := build/$(PLATFORM)/nlm_denoise
-# Host 与 kernel 对象都按平台隔离，避免不 clean 直接切换 PLATFORM 时复用错误对象。
-OBJ_DIR     := build/obj/$(PLATFORM)
-INCLUDES    := -Iinclude -Ithird_party/stb
+OBJ_DIR         := build/obj/$(PLATFORM)
+INCLUDES        := -Iinclude
+HOST_SRCS       := $(wildcard src/*.cpp)
+HOST_OBJS       := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(HOST_SRCS))
+KER_SRC         := src/kernels.$(SUFFIX)
+KER_OBJ         := $(OBJ_DIR)/kernels.o
+OBJS            := $(HOST_OBJS) $(KER_OBJ)
+HEADERS         := $(wildcard include/*.h)
 
-HOST_SRCS   := src/main.cpp src/params.cpp src/image_io.cpp src/pipeline.cpp \
-               src/nlm_cpu_ref.cpp tester/validate.cpp tester/benchmark.cpp \
-               tester/metrics.cpp tester/test_units.cpp
-KER_SRC     := kernels/$(PLATFORM)/kernels.$(SUFFIX)
-HOST_OBJS   := $(addprefix $(OBJ_DIR)/,$(HOST_SRCS:.cpp=.o))
-# OBJ_DIR 已含平台名；切换 PLATFORM 会自动重编 Host 与 kernel 对象。
-KER_OBJ     := $(OBJ_DIR)/kernels/kernels.o
-OBJS        := $(HOST_OBJS) $(KER_OBJ)
+INPUT       ?= test_images/noisy_256x256_3ch_sigma25.png
+OUTPUT      ?= output/images/denoised.png
+PARAMS      ?= params.txt
+MODE        ?= $(if $(filter metax,$(PLATFORM)),1,2)
+RUN_LOG     ?= output/logs/nlm_perf.csv
+SIZES       ?= 1920x1080,3840x2160
+CHANNELS    ?= 1,3
+PARAM_SETS  ?= all
+WARMUP      ?= 3
+REPEAT      ?= 10
+BENCH_LOG   ?= output/results/benchmark.csv
 
-# Tester's actual verbose argument (e.g., --verbose, -v)
-TEST_VERBOSE_FLAG := --verbose
-# User-provided verbose mode (true/false; default: false)
-VERBOSE          :=
-
-# -------------------------------
-# Process User Input (VERBOSE → Tester Flag)
-# -------------------------------
-# Translates `VERBOSE=true` (case-insensitive) to the tester's verbose flag.
-# If VERBOSE is not "true" (or empty), no flag is passed.
-VERBOSE_ARG := $(if $(filter true True TRUE,$(VERBOSE)),$(TEST_VERBOSE_FLAG))
-
-# -------------------------------
-# Phony Targets
-# -------------------------------
-.PHONY: all build run test clean
-
-# Default target: Build + run tests (non-verbose)
-all: build run
-
-# Build target: compile a platform-specific binary, then refresh the stable CLI path.
+.PHONY: all build run validate test bench clean FORCE
+all: build
 build: $(PLATFORM_TARGET)
+
+# Keep the documented CLI path while all recipes use their own platform binary.
+$(TARGET): $(PLATFORM_TARGET) FORCE
 	@cp -f $(PLATFORM_TARGET) $(TARGET)
-	@echo "=== Selected $(PLATFORM_TARGET) -> $(TARGET) ==="
+build: $(TARGET)
 
-# Run target: Execute test suite (supports `VERBOSE=true` for verbose output)
 run: build
-	@echo "=== Running tests (output from $(TARGET)) ==="
-	@# Show verbose mode status (friendly for users)
-	@if [ -n "$(VERBOSE_ARG)" ]; then \
-	    echo "=== Verbose mode: Enabled (using '$(TEST_VERBOSE_FLAG)') ==="; \
-	else \
-	    echo "=== Verbose mode: Disabled ==="; \
-	fi
-	$(TARGET) units
-	@if [ -n "$(VERBOSE_ARG)" ]; then \
-	    echo "=== Verbose extra: GPU 端到端正确性校验（256x256 RGB）==="; \
-	    $(TARGET) gen -o /tmp/nlm_make_run.png --size 256x256 --channels 3 --sigma 25; \
-	    $(TARGET) validate -i /tmp/nlm_make_run.png -p params/default.txt; \
-	fi
+	$(PLATFORM_TARGET) run -i "$(INPUT)" -o "$(OUTPUT)" -p "$(PARAMS)" --kernel $(MODE) --log "$(RUN_LOG)"
 
-# Backward-compatible alias of `run`
-test: run
+validate: build
+	$(PLATFORM_TARGET) validate -i "$(INPUT)" -o "$(OUTPUT)" -p "$(PARAMS)"
 
-# Clean target: Delete the whole build directory (executable + objects)
+test: build
+	$(PLATFORM_TARGET) units
+	$(PLATFORM_TARGET) validate -i "$(INPUT)" -p "$(PARAMS)"
+
+bench: build
+	$(PLATFORM_TARGET) bench --sizes "$(SIZES)" --channels "$(CHANNELS)" --param-sets "$(PARAM_SETS)" --warmup $(WARMUP) --repeat $(REPEAT) --log "$(BENCH_LOG)"
+
 clean:
-	@echo "=== Cleaning temporary files (build/) ==="
 	rm -rf build
 
-# -------------------------------
-# Dependency Rules (Core Logic)
-# -------------------------------
-# Generate platform-specific executable: link kernels + host modules + tester modules.
+# Track compiler and flag changes without touching unchanged objects.
+$(OBJ_DIR)/build_flags.txt: FORCE
+	@mkdir -p $(OBJ_DIR)
+	@printf '%s\n' '$(CC) $(CFLAGS) $(COMP_ONLY_FLAGS) $(PLATFORM_DEFINE) $(INCLUDES) $(EXTRA_LIBS)' > $@.tmp
+	@cmp -s $@.tmp $@ && rm -f $@.tmp || mv -f $@.tmp $@
+
 $(PLATFORM_TARGET): $(OBJS)
 	@mkdir -p $(dir $@)
-	@echo "=== Linking executable ($(PLATFORM_TARGET), $(PLATFORM)) ==="
 	$(CC) $(CFLAGS) $(PLATFORM_DEFINE) -o $@ $(OBJS) $(EXTRA_LIBS)
 
-# Host 侧对象：src/**.cpp 与 tester/**.cpp → build/obj/{src,tester}/**.o
-$(OBJ_DIR)/%.o: %.cpp
+$(OBJ_DIR)/%.o: src/%.cpp $(HEADERS) $(OBJ_DIR)/build_flags.txt
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(PLATFORM_DEFINE) $(INCLUDES) -c $< -o $@
 
-# 设备侧对象：kernels/$(PLATFORM)/kernels.$(SUFFIX) → build/obj/kernels/kernels.o
-# 头文件依赖显式列出（impl + 接口头 + PAL + 参数头），保证改动即触发重编
-$(KER_OBJ): $(KER_SRC) kernels/common/kernels_impl.inl \
-            include/kernels/kernels.h include/pal/platform_api.h include/nlm/params.h
+$(KER_OBJ): $(KER_SRC) src/kernels.cu $(HEADERS) $(OBJ_DIR)/build_flags.txt
 	@mkdir -p $(dir $@)
-	@echo "=== Compiling kernels ($(KER_SRC)) ==="
 	$(CC) $(CFLAGS) $(COMP_ONLY_FLAGS) $(PLATFORM_DEFINE) $(INCLUDES) -c $(KER_SRC) -o $@

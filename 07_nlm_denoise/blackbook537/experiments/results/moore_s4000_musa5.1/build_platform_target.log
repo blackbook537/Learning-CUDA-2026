@@ -1,3 +1,0 @@
-=== Linking executable (build/moore/nlm_denoise, moore) ===
-/usr/local/musa/bin/mcc -std=c++11 -O3 -DPLATFORM_MOORE -o build/moore/nlm_denoise build/obj/moore/src/main.o build/obj/moore/src/params.o build/obj/moore/src/image_io.o build/obj/moore/src/pipeline.o build/obj/moore/src/nlm_cpu_ref.o build/obj/moore/tester/validate.o build/obj/moore/tester/benchmark.o build/obj/moore/tester/metrics.o build/obj/moore/tester/test_units.o build/obj/moore/kernels/kernels.o -I/usr/local/musa/include -L/usr/local/musa/lib -Wl,-rpath,/usr/local/musa/lib -lmusart
-=== Selected build/moore/nlm_denoise -> build/nlm_denoise ===

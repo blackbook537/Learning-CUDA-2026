@@ -1,4 +1,4 @@
-#include "core/image_io.h"
+#include "image_io.h"
 
 #include <cstring>
 #include <sys/stat.h>

@@ -1,4 +1,4 @@
-#include "nlm/params.h"
+#include "params.h"
 
 #include <cstdio>
 #include <cstdlib>
